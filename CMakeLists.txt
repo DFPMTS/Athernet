@@ -4,16 +4,40 @@ cmake_minimum_required(VERSION 3.4)
 
 project("NewProject")
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../../FRUT/prefix/FRUT/cmake")
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+
+  # The file structure has to be:
+  # ---- FRUT
+  #   |- JUCE
+  #   |- asiosdk_2.3.3_2019-06-14
+  #   |- boost_1_82_0
+  #   |- [This Project]
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../FRUT/prefix/FRUT/cmake")
+  set(JUCE_MODULES_GLOBAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../JUCE/modules")
+  set(BOOST_PATH "${CMAKE_CURRENT_LIST_DIR}/../boost_1_82_0/")
+  set(ASIO_PATH "${CMAKE_CURRENT_LIST_DIR}/../asiosdk_2.3.3_2019-06-14/common")
+
+elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+
+  # This is my computer specific setting
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../../FRUT/prefix/FRUT/cmake")  
+  set(JUCE_MODULES_GLOBAL_PATH "/Users/dfpmts/JUCE/modules/")
+  set(BOOST_PATH "/opt/homebrew/Cellar/boost/1.82.0_1/include/")
+  
+else()
+
+  # Abort!
+  message(FATAL_ERROR "Unknown platform, Abort.")
+
+endif()
+
+
 include(Reprojucer)
 
 
 set(NewProject_jucer_FILE
   "${CMAKE_CURRENT_LIST_DIR}/NewProject.jucer"
 )
-
-
-set(JUCE_MODULES_GLOBAL_PATH "/Users/dfpmts/JUCE/modules/")
 
 
 jucer_project_begin(
@@ -31,7 +55,7 @@ jucer_project_settings(
   PROJECT_TYPE "Console Application"
   BUNDLE_IDENTIFIER "com.yourcompany.NewProject"
   CXX_LANGUAGE_STANDARD "C++17"
-  HEADER_SEARCH_PATHS "/opt/homebrew/Cellar/boost/1.82.0_1/include/"
+  HEADER_SEARCH_PATHS ${BOOST_PATH} ${ASIO_PATH}
 )
 
 # --------------------------------Source----------------------------------- #
@@ -70,13 +94,13 @@ jucer_project_module(
   juce_audio_devices
   PATH "${JUCE_MODULES_GLOBAL_PATH}"
   # JUCE_USE_WINRT_MIDI
-  # JUCE_ASIO
-  # JUCE_WASAPI
-  # JUCE_DIRECTSOUND
-  # JUCE_ALSA
+  JUCE_ASIO ON
+  JUCE_WASAPI OFF
+  JUCE_DIRECTSOUND OFF
+  JUCE_ALSA OFF
   # JUCE_JACK
   # JUCE_BELA
-  # JUCE_USE_ANDROID_OBOE
+  JUCE_USE_ANDROID_OBOE OFF
   # JUCE_USE_OBOE_STABILIZED_CALLBACK
   # JUCE_USE_ANDROID_OPENSLES
   # JUCE_DISABLE_AUDIO_MIXING_WITH_OTHER_APPS
@@ -166,22 +190,46 @@ jucer_project_module(
   # JUCE_ENABLE_LIVE_CONSTANT_EDITOR
 )
 
-jucer_export_target(
-  "Xcode (macOS)"
-)
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 
-jucer_export_target_configuration(
-  "Xcode (macOS)"
-  NAME "Debug"
-  DEBUG_MODE ON
-  BINARY_NAME "NewProject"
-)
+  jucer_export_target(
+    "Visual Studio 2022"
+    EXTRA_COMPILER_FLAGS
+    "/bigobj"
+  )
 
-jucer_export_target_configuration(
-  "Xcode (macOS)"
-  NAME "Release"
-  DEBUG_MODE OFF
-  BINARY_NAME "NewProject"
-)
+  jucer_export_target_configuration(    
+    "Visual Studio 2022"
+    NAME "Debug"
+    DEBUG_MODE ON
+  )
+
+  jucer_export_target_configuration(
+    "Visual Studio 2022"
+    NAME "Release"
+    DEBUG_MODE OFF
+  )
+
+elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+
+  jucer_export_target(
+    "Xcode (macOS)"
+  )
+
+  jucer_export_target_configuration(
+    "Xcode (macOS)"
+    NAME "Debug"
+    DEBUG_MODE ON
+    BINARY_NAME "NewProject"
+  )
+
+  jucer_export_target_configuration(
+    "Xcode (macOS)"
+    NAME "Release"
+    DEBUG_MODE OFF
+    BINARY_NAME "NewProject"
+  )
+
+endif()
 
 jucer_project_end()

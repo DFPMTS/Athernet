@@ -66,8 +66,6 @@ void* main_loop(void*)
 	auto device_setup = adm.getAudioDeviceSetup();
 	device_setup.sampleRate = 48'000;
 
-	adm.setAudioDeviceSetup(device_setup, false);
-
 	auto tester = std::make_unique<Tester>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
@@ -92,6 +90,11 @@ void* main_loop(void*)
 					  << output_devices[i] << "\n";
 		std::cerr << "-------------------\n";
 	}
+
+	adm.setAudioDeviceSetup(device_setup, false);
+
+	std::cerr << "Please configure your ASIO:\n";
+	getchar();
 
 	adm.addAudioCallback(tester.get());
 	std::cerr << "Running...\n";
