@@ -55,7 +55,16 @@ jucer_project_settings(
   PROJECT_TYPE "Console Application"
   BUNDLE_IDENTIFIER "com.yourcompany.NewProject"
   CXX_LANGUAGE_STANDARD "C++17"
-  HEADER_SEARCH_PATHS ${BOOST_PATH} ${ASIO_PATH}
+  HEADER_SEARCH_PATHS ${BOOST_PATH} ${ASIO_PATH} "${CMAKE_CURRENT_LIST_DIR}/Include/"
+)
+
+# --------------------------------Include---------------------------------- #
+
+jucer_project_files("NewProject/Include"
+# Compile   Xcode     Binary    File
+#           Resource  Resource
+  x         .         .         "Include/RingBuffer.hpp"
+  x         .         .         "Include/Config.hpp"
 )
 
 # --------------------------------Source----------------------------------- #
@@ -71,16 +80,7 @@ jucer_project_files("NewProject/Source"
 jucer_project_files("NewProject/Tests"
 # Compile   Xcode     Binary    File
 #           Resource  Resource
-  x         .         .         "Tests/test_boost_circular_buffer.cpp"
-)
-
-
-# --------------------------------Include---------------------------------- #
-
-jucer_project_files("NewProject/Include"
-# Compile   Xcode     Binary    File
-#           Resource  Resource
-  x         .         .         "Include/RingBuffer.cpp"
+  x         .         .         "Tests/test_RingBuffer.cpp"
 )
 
 # ------------------------------------------------------------------------- #
