@@ -10,17 +10,17 @@ using namespace std::chrono_literals;
 
 class Tester : public juce::AudioIODeviceCallback {
 public:
-	virtual void audioDeviceAboutToStart(juce::AudioIODevice* device) override
+	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override
 	{
 		record_start_time_point = std::chrono::high_resolution_clock::now();
 	}
 
 	virtual void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,
-		int numInputChannels,
+		[[maybe_unused]] int numInputChannels,
 		float* const* outputChannelData,
-		int numOutputChannels,
+		[[maybe_unused]] int numOutputChannels,
 		int numSamples,
-		const juce::AudioIODeviceCallbackContext& context) override
+		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
 		if (std::chrono::high_resolution_clock::now() - record_start_time_point < record_length) {
 			for (int i = 0; i < numSamples; ++i) {
@@ -104,7 +104,7 @@ void* main_loop(void*)
 	return NULL;
 }
 
-int main(int argc, char* argv[])
+int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
 
 #ifndef NDEBUG
