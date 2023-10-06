@@ -2,3 +2,4 @@
 build/
 Builds/
 .vscode
+Extras/*.txt
