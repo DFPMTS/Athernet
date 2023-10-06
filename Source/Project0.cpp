@@ -13,6 +13,11 @@ using namespace std::chrono_literals;
 
 class Tester : public juce::AudioIODeviceCallback {
 public:
+	Tester()
+		: recorded(4800'000)
+	{
+	}
+
 	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override
 	{
 		record_start_time_point = std::chrono::high_resolution_clock::now();
@@ -26,16 +31,15 @@ public:
 		[[maybe_unused]] int numOutputChannels, int numSamples,
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
-		if (total_samples > sample_rate) {
-			total_samples -= sample_rate;
+		if (total_samples > sample_rate * 100) {
+			total_samples %= sample_rate;
 		}
 
 		if (std::chrono::high_resolution_clock::now() - record_start_time_point < record_length) {
 			for (int i = 0; i < numSamples; ++i) {
-				recorded.push(inputChannelData[0][i]);
+				recorded[total_samples++] = inputChannelData[0][i];
 				if (play_sound) {
 					outputChannelData[0][i] = sin(total_samples * 2 * PI * sound_f / sample_rate);
-					++total_samples;
 				}
 			}
 		} else {
@@ -46,9 +50,8 @@ public:
 			}
 
 			for (int i = 0; i < numSamples; ++i) {
-				if (!recorded.empty()) {
-					outputChannelData[0][i] = recorded.front() * 20;
-					recorded.pop();
+				if (read_samples < total_samples) {
+					outputChannelData[0][i] = recorded[read_samples++] * 20;
 				} else {
 					outputChannelData[0][i] = 0;
 				}
@@ -66,11 +69,12 @@ private:
 
 	bool play_sound = false;
 	int total_samples = 0;
+	int read_samples = 0;
 	int sound_f = 7000;
 	int sample_rate = 48000;
 
 	// This implementaion is BROKEN since there would memory allocation in the callback
-	std::queue<float> recorded;
+	std::vector<float> recorded;
 };
 
 void* Project0_main_loop(void*)
@@ -126,7 +130,7 @@ void* Project0_main_loop(void*)
 				tester->set_play_sound(true);
 				break;
 			} else if (s == "n") {
-				tester->set_play_sound(true);
+				tester->set_play_sound(false);
 				break;
 			}
 		} while (true);
@@ -134,7 +138,7 @@ void* Project0_main_loop(void*)
 
 	adm.addAudioCallback(tester.get());
 	std::cerr << "Running...\n";
-	getchar();
+	std::this_thread::sleep_for(25s);
 	adm.removeAudioCallback(tester.get());
 
 	return NULL;
