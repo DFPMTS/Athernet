@@ -151,6 +151,32 @@ void* Project1_main_loop(void*)
 
 	auto physical_layer = std::make_unique<PHY_layer>();
 
+	auto device_type = adm.getCurrentDeviceTypeObject();
+
+	{
+		auto default_input = device_type->getDefaultDeviceIndex(true);
+		auto input_devices = device_type->getDeviceNames(true);
+
+		std::cerr << "-------Input-------\n";
+		for (int i = 0; i < input_devices.size(); ++i)
+			std::cerr << (i == default_input ? "x " : "  ") << input_devices[i] << "\n";
+	}
+
+	{
+		auto default_output = device_type->getDefaultDeviceIndex(false);
+		auto output_devices = device_type->getDeviceNames(false);
+
+		std::cerr << "-------Output------\n";
+		for (int i = 0; i < output_devices.size(); ++i)
+			std::cerr << (i == default_output ? "x " : "  ") << output_devices[i] << "\n";
+		std::cerr << "-------------------\n";
+	}
+
+	// device_setup.inputDeviceName = "MacBook Pro Microphone";
+	// device_setup.outputDeviceName = "USB Audio Device";
+
+	// device_setup.outputDeviceName = "MacBook Pro Speakers";
+
 	adm.setAudioDeviceSetup(device_setup, false);
 
 	std::cerr << "Please configure your ASIO:\n";
@@ -161,7 +187,7 @@ void* Project1_main_loop(void*)
 	std::vector<int> a;
 	srand(time(0));
 
-	for (int i = 0; i < 1000; ++i) {
+	for (int i = 0; i < 250; ++i) {
 		if (rand() % 2)
 			a.push_back(0);
 		else

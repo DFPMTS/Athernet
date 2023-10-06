@@ -37,8 +37,8 @@ public:
 		{
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 6'000;
-			preamble_f2 = 16'000;
-			preamble_length = 100;
+			preamble_f2 = 10'000;
+			preamble_length = 200;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -69,7 +69,7 @@ public:
 
 		// Carrier Wave
 		{
-			carrier_f = 6'000;
+			carrier_f = 3'000;
 
 			int samples_per_bit = sample_rate / bit_rate;
 
