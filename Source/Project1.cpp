@@ -13,7 +13,16 @@
 
 #define PI acos(-1)
 
+// #define WIN
+
+#ifndef WIN
+#define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
+#else
+#define NOTEBOOK_DIR "D:/fa23/Athernet/Extras/"s
+#endif
+
 using namespace std::chrono_literals;
+using namespace std::string_literals;
 
 class PHY_layer : public juce::AudioIODeviceCallback {
 public:
@@ -52,7 +61,7 @@ public:
 
 	virtual void audioDeviceStopped() override
 	{
-		std::fstream fout("D:/fa23/Athernet/Extras/received.txt", std::ios_base::out);
+		std::fstream fout(NOTEBOOK_DIR + "received.txt", std::ios_base::out);
 		float buffer[100000];
 		auto size = m_recv_buffer.pop(buffer, 100000);
 		for (int i = 0; i < size; ++i) {
@@ -171,7 +180,7 @@ void* Project1_main_loop(void*)
 
 	std::this_thread::sleep_for(500ms);
 
-	std::fstream fout("D:/fa23/Athernet/Extras/sent.txt", std::ios_base::out);
+	std::fstream fout(NOTEBOOK_DIR + "sent.txt"s, std::ios_base::out);
 
 	for (auto x : a) {
 		fout << x << " ";

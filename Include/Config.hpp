@@ -6,6 +6,16 @@
 #include <iostream>
 #include <vector>
 
+// #define WIN
+
+using namespace std::string_literals;
+
+#ifndef WIN
+#define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
+#else
+#define NOTEBOOK_DIR "D:/fa23/Athernet/Extras/"s
+#endif
+
 namespace Athernet {
 
 // put preambles, ring buffer size ... etc inside.
@@ -77,18 +87,18 @@ public:
 		}
 
 		{
-			std::ofstream fout("D:/fa23/Athernet/Extras/preamble.txt");
+			std::ofstream fout(NOTEBOOK_DIR + "preamble.txt"s);
 			for (auto x : preamble)
 				fout << x << " ";
 		}
 
 		{
-			std::ofstream fout("D:/fa23/Athernet/Extras/carrier_0.txt");
+			std::ofstream fout(NOTEBOOK_DIR + "carrier_0.txt"s);
 			for (auto x : carrier_0)
 				fout << x << " ";
 		}
 		{
-			std::ofstream fout("D:/fa23/Athernet/Extras/carrier_1.txt");
+			std::ofstream fout(NOTEBOOK_DIR + "carrier_1.txt"s);
 			for (auto x : carrier_1)
 				fout << x << " ";
 		}
