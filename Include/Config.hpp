@@ -104,7 +104,7 @@ public:
 	}
 
 	// get buffer size for physical layer
-	size_t get_physical_buffer_size() const { return physical_buffer_size; }
+	int get_physical_buffer_size() const { return physical_buffer_size; }
 
 	const std::vector<float>& get_preamble() const { return preamble; }
 
@@ -126,7 +126,7 @@ private:
 	std::vector<float> carrier_0;
 	std::vector<float> carrier_1;
 
-	size_t physical_buffer_size = 100'000;
+	int physical_buffer_size = 100'000;
 };
 
 }

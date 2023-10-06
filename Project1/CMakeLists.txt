@@ -59,13 +59,6 @@ jucer_project_settings(
   HEADER_SEARCH_PATHS ${BOOST_PATH} ${ASIO_PATH} "${CMAKE_CURRENT_LIST_DIR}/../Include/"
 )
 
-# --------------------------------Source----------------------------------- #
-
-jucer_project_files("Project1/Source"
-# Compile   Xcode     Binary    File
-#           Resource  Resource
-  x         .         .         "Source/Project1.cpp"  
-)
 
 # --------------------------------Include---------------------------------- #
 
@@ -73,8 +66,16 @@ jucer_project_files("Project1/Include"
 # Compile   Xcode     Binary    File
 #           Resource  Resource
   .         .         .         "Include/Config.hpp"  
+  .         .         .         "Include/RingBuffer.hpp"
 )
 
+# --------------------------------Source----------------------------------- #
+
+jucer_project_files("Project1/Source"
+# Compile   Xcode     Binary    File
+#           Resource  Resource
+  x         .         .         "Source/Project1.cpp"  
+)
 
 # ------------------------------------------------------------------------- #
 

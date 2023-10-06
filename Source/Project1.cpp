@@ -1,5 +1,7 @@
 #include "Config.hpp"
 #include "JuceHeader.h"
+#include "RingBuffer.hpp"
+#include <algorithm>
 #include <boost/circular_buffer.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <chrono>
@@ -17,8 +19,6 @@ class PHY_layer : public juce::AudioIODeviceCallback {
 public:
 	PHY_layer()
 		: config { Athernet::Config::get_instance() }
-		, m_send_buffer { config.get_physical_buffer_size() }
-		, m_recv_buffer { config.get_physical_buffer_size() }
 	{
 	}
 
@@ -40,61 +40,42 @@ public:
 		// 	++total_samples;
 		// }
 
-		if (m_recv_buffer.write_available() < 50000) {
+		if (m_recv_buffer.size() > 50000) {
 			return;
 		}
 
 		for (int i = 0; i < numSamples; ++i) {
-			m_recv_buffer.push(inputChannelData[0][i]);
+			auto res = m_recv_buffer.push(inputChannelData[0][i]);
+			assert(res);
 		}
 	}
 
 	virtual void audioDeviceStopped() override
 	{
 		std::fstream fout("D:/fa23/Athernet/Extras/received.txt", std::ios_base::out);
-		m_recv_buffer.consume_all([&](float x) { fout << x << " "; });
+		float buffer[100000];
+		auto size = m_recv_buffer.pop(buffer, 100000);
+		for (int i = 0; i < size; ++i) {
+			fout << buffer[i] << " ";
+		}
 	}
 
 	void deliver_bits(const std::vector<int>& bits)
 	{
-		send_1();
-		send_0();
-		send_1();
-		send_0();
-		send_1();
-		send_1();
-		send_0();
-		send_1();
-		send_0();
-		send_1();
-		send_0();
-		send_1();
-		send_1();
-		send_0();
-		send_preamble();
-		send_uint_16(bits.size());
+		std::vector<float> physical_frame;
+		append_preamble(physical_frame);
+		append_uint_16(bits.size(), physical_frame);
 		for (const auto& bit : bits) {
 			assert(bit == 0 || bit == 1);
 			if (bit) {
-				send_1();
+				append_1(physical_frame);
 			} else {
-				send_0();
+				append_0(physical_frame);
 			}
 		}
-		send_1();
-		send_0();
-		send_1();
-		send_0();
-		send_1();
-		send_1();
-		send_0();
-		send_1();
-		send_0();
-		send_1();
-		send_0();
-		send_1();
-		send_1();
-		send_0();
+
+		auto result = m_send_buffer.push(physical_frame);
+		assert(result);
 	}
 
 	std::vector<std::vector<int>> get_frames() { }
@@ -102,36 +83,44 @@ public:
 	~PHY_layer() { }
 
 private:
-	void send_preamble() { send_vec(config.get_preamble()); }
+	const std::vector<float>& get_preamble() { return config.get_preamble(); }
 
-	void send_0() { send_vec(config.get_carrier_0()); }
+	const std::vector<float>& get_0() { return config.get_carrier_0(); }
 
-	void send_1() { send_vec(config.get_carrier_1()); }
+	const std::vector<float>& get_1() { return config.get_carrier_1(); }
 
-	void send_uint_16(size_t n)
+	void append_preamble(std::vector<float>& signal) { append_vec(get_preamble(), signal); }
+
+	void append_0(std::vector<float>& signal) { append_vec(get_0(), signal); }
+	void append_1(std::vector<float>& signal) { append_vec(get_1(), signal); }
+
+	void append_uint_16(size_t x, std::vector<float>& signal)
 	{
-		assert(n < 65536);
+		assert(x < 65536);
+
 		for (int i = 0; i < 16; ++i) {
-			if (n & (1LL << i)) {
-				send_1();
+			if (x & (1ULL << i)) {
+				append_1(signal);
 			} else {
-				send_0();
+				append_0(signal);
 			}
 		}
 	}
 
-	void send_vec(const std::vector<float>& vec)
+	void append_vec(const std::vector<float>& from, std::vector<float>& to)
 	{
-		auto it = m_send_buffer.push(std::begin(vec), std::end(vec));
-		assert(it == std::end(vec));
+		std::copy(std::begin(from), std::end(from), std::back_inserter(to));
 	}
 
 private:
 	Athernet::Config& config;
 
 	// Single Producer, Single Consumer-safe
-	boost::lockfree::spsc_queue<float> m_send_buffer;
-	boost::lockfree::spsc_queue<float> m_recv_buffer;
+	// boost::lockfree::spsc_queue<float> m_send_buffer;
+	// boost::lockfree::spsc_queue<float> m_recv_buffer;
+
+	Athernet::RingBuffer<float> m_send_buffer;
+	Athernet::RingBuffer<float> m_recv_buffer;
 
 	// not thread safe
 	boost::circular_buffer<float> m_frame_buffer;
@@ -163,16 +152,16 @@ void* Project1_main_loop(void*)
 	std::vector<int> a;
 	srand(time(0));
 
-	for (int i = 0; i < 500; ++i) {
+	for (int i = 0; i < 1000; ++i) {
 		if (rand() % 2)
 			a.push_back(0);
 		else
 			a.push_back(1);
 	}
 
-	physical_layer->deliver_bits(a);
-
 	adm.addAudioCallback(physical_layer.get());
+
+	physical_layer->deliver_bits(a);
 
 	std::this_thread::sleep_for(3s);
 
