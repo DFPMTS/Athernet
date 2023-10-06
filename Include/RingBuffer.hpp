@@ -1,82 +1,91 @@
 #pragma once
 
-#include <boost/circular_buffer.hpp>
+#include "Config.hpp"
+#include <atomic>
 #include <vector>
 
 namespace Athernet {
 
-template <typename T>
-class RingBuffer {
-public:
-	RingBuffer(size_t capacity)
-		: m_circular_buffer { capacity }
-	{
-	}
-
-	// ? Maybe refactor with perfect forwarding
-
-	void push(const T& item)
-	{
-		m_circular_buffer.push_back(item);
-	}
-
-	void push(T&& item)
-	{
-		m_circular_buffer.push_back(std::move(item));
-	}
-
-	void push(const std::vector<T>& vec_item)
-	{
-		for (const auto& item : vec_item)
-			push(item);
-	}
-
-	void push(std::vector<T>&& vec_item)
-	{
-		for (auto&& item : vec_item)
-			push(std::move(item));
-	}
-
-	T& front()
-	{
-		return m_circular_buffer.front();
-	}
-
-	void pop()
-	{
-		m_circular_buffer.pop_front();
-	}
-
-	T& operator[](size_t index)
-	{
-		return m_circular_buffer[index];
-	}
-
-	size_t size() const
-	{
-		return m_circular_buffer.size();
-	}
-
-	size_t capacity() const
-	{
-		return m_circular_buffer.capacity();
-	}
-
-	/*!
-		applies dot product on [index, index+vec.size())
-		needs T * T -> T, T + T -> T
-		\throw std::out_of_range if index+vec.size() > this->size()
-	*/
-	T dot_product(size_t index, std::vector<T> vec)
-	{
-		T result {};
-		for (size_t i = 0; i < vec.size(); ++i)
-			result = result + m_circular_buffer.at(index + i) * vec[i];
-		return result;
-	}
+// SPSC ring buffer
+template <typename T> class RingBuffer {
 
 private:
-	boost::circular_buffer<T> m_circular_buffer;
+	void increment(int& x)
+	{
+		if (++x == m_capacity) {
+			x = 0;
+		}
+	}
+
+public:
+	RingBuffer()
+		: m_capacity(Athernet::Config::get_instance().get_physical_buffer_size())
+		, m_size(0)
+		, m_data(m_capacity)
+		, m_head(0)
+		, m_tail(0)
+
+	{
+	}
+
+	bool push(const std::vector<T>& vec)
+	{
+		int vec_size = static_cast<int>(vec.size());
+		int size_value = m_size.load(std::memory_order_relaxed);
+
+		if (vec_size > capacity() - size_value) {
+			return false;
+		}
+
+		for (int i = 0; i < vec_size; ++i) {
+			m_data[m_tail] = vec[i];
+			increment(m_tail);
+		}
+
+		m_size.store(size_value + vec_size, std::memory_order_release);
+		return true;
+	}
+
+	bool push(const T& val)
+	{
+		int size_value = m_size.load(std::memory_order_relaxed);
+
+		if (size_value == capacity()) {
+			return false;
+		}
+
+		m_data[m_tail] = val;
+		increment(m_tail);
+
+		m_size.store(size_value + 1, std::memory_order_release);
+		return true;
+	}
+
+	int pop(T* dest, int count)
+	{
+		int size_value = m_size.load(std::memory_order_acquire);
+		int popped_count = size_value < count ? size_value : count;
+
+		for (int i = 0; i < popped_count; ++i) {
+			dest[i] = m_data[m_head];
+			increment(m_head);
+		}
+
+		m_size.store(size_value - popped_count, std::memory_order_relaxed);
+
+		return popped_count;
+	}
+
+	int size() { return m_size; }
+
+	int capacity() { return m_capacity; }
+
+private:
+	int m_capacity;
+	std::atomic<int> m_size;
+	int m_head;
+	int m_tail;
+	std::vector<T> m_data;
 };
 
 }
