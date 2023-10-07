@@ -13,7 +13,7 @@
 
 #define PI acos(-1)
 
-// #define WIN
+#define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -49,7 +49,7 @@ public:
 		// 	++total_samples;
 		// }
 
-		if (m_recv_buffer.size() > 50000) {
+		if (m_recv_buffer.size() > 500000) {
 			return;
 		}
 
@@ -59,15 +59,7 @@ public:
 		}
 	}
 
-	virtual void audioDeviceStopped() override
-	{
-		std::fstream fout(NOTEBOOK_DIR + "received.txt", std::ios_base::out);
-		float buffer[100000];
-		auto size = m_recv_buffer.pop(buffer, 100000);
-		for (int i = 0; i < size; ++i) {
-			fout << buffer[i] << " ";
-		}
-	}
+	virtual void audioDeviceStopped() override { }
 
 	void deliver_bits(const std::vector<int>& bits)
 	{
@@ -83,13 +75,28 @@ public:
 			}
 		}
 
+		append_silence(physical_frame);
 		auto result = m_send_buffer.push(physical_frame);
 		assert(result);
+	}
+
+	void send_nonsense(int size)
+	{
+		std::vector<float> nonsense;
+		for (int i = 0; i < size; ++i) {
+			if (rand() & 1)
+				append_1(nonsense);
+			else
+				append_0(nonsense);
+		}
+		m_send_buffer.push(nonsense);
 	}
 
 	std::vector<std::vector<int>> get_frames() { }
 
 	~PHY_layer() { }
+
+	Athernet::RingBuffer<float> m_recv_buffer;
 
 private:
 	const std::vector<float>& get_preamble() { return config.get_preamble(); }
@@ -116,6 +123,8 @@ private:
 		}
 	}
 
+	void append_silence(std::vector<float>& signal) { append_vec(silence, signal); }
+
 	void append_vec(const std::vector<float>& from, std::vector<float>& to)
 	{
 		std::copy(std::begin(from), std::end(from), std::back_inserter(to));
@@ -129,10 +138,11 @@ private:
 	// boost::lockfree::spsc_queue<float> m_recv_buffer;
 
 	Athernet::RingBuffer<float> m_send_buffer;
-	Athernet::RingBuffer<float> m_recv_buffer;
 
 	// not thread safe
 	boost::circular_buffer<float> m_frame_buffer;
+
+	std::vector<float> silence = std::vector<float>(200);
 
 	int total_samples = 0;
 };
@@ -184,32 +194,46 @@ void* Project1_main_loop(void*)
 	std::this_thread::sleep_for(100ms);
 	std::cerr << "Running...\n";
 
-	std::vector<int> a;
+	std::ifstream fin("INPUT.bin");
+
 	srand(time(0));
 
-	for (int i = 0; i < 250; ++i) {
-		if (rand() % 2)
-			a.push_back(0);
-		else
-			a.push_back(1);
+	std::fstream fout(NOTEBOOK_DIR + "sent.txt"s, std::ios_base::out);
+
+	for (int i = 0; i < 5; ++i) {
+		std::vector<int> a;
+		for (int i = 0; i < 150; ++i) {
+			if (rand() % 2)
+				a.push_back(1);
+			else
+				a.push_back(0);
+		}
+
+		physical_layer->deliver_bits(a);
+		for (const auto& x : a)
+			fout << x << " ";
 	}
 
 	adm.addAudioCallback(physical_layer.get());
 
-	physical_layer->deliver_bits(a);
+	// physical_layer->send_nonsense(500);
 
-	std::this_thread::sleep_for(3s);
+	std::this_thread::sleep_for(7s);
 
 	// getchar();
 
 	adm.removeAudioCallback(physical_layer.get());
 
-	std::this_thread::sleep_for(500ms);
+	static float recv[1000000];
 
-	std::fstream fout(NOTEBOOK_DIR + "sent.txt"s, std::ios_base::out);
+	auto size = physical_layer->m_recv_buffer.pop(recv, 1000000);
 
-	for (auto x : a) {
-		fout << x << " ";
+	{
+		std::ofstream fout(NOTEBOOK_DIR + "received.txt");
+
+		for (int i = 0; i < size; ++i) {
+			fout << recv[i] << " ";
+		}
 	}
 
 	return NULL;
@@ -217,6 +241,7 @@ void* Project1_main_loop(void*)
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
+	std::ios::sync_with_stdio(false);
 	auto message_manager = juce::MessageManager::getInstance();
 	message_manager->callFunctionOnMessageThread(Project1_main_loop, NULL);
 

@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-// #define WIN
+#define WIN
 
 using namespace std::string_literals;
 
@@ -28,7 +28,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 4000;
+		bit_rate = 2000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -69,7 +69,7 @@ public:
 
 		// Carrier Wave
 		{
-			carrier_f = 3'000;
+			carrier_f = 8000;
 
 			int samples_per_bit = sample_rate / bit_rate;
 
@@ -77,13 +77,6 @@ public:
 				carrier_0.push_back(static_cast<float>(cos(2 * PI * carrier_f * i / sample_rate)));
 				carrier_1.push_back(static_cast<float>(-cos(2 * PI * carrier_f * i / sample_rate)));
 			}
-
-			std::fstream fout("carriers.txt", std::ios_base::out);
-			for (const auto& x : carrier_0)
-				fout << x << ", ";
-			fout << "\n";
-			for (const auto& x : carrier_1)
-				fout << x << ", ";
 		}
 
 		{
@@ -136,7 +129,7 @@ private:
 	std::vector<float> carrier_0;
 	std::vector<float> carrier_1;
 
-	int physical_buffer_size = 100'000;
+	int physical_buffer_size = 100'0000;
 };
 
 }
