@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-#define WIN
+// #define WIN
 
 using namespace std::string_literals;
 
@@ -69,7 +69,7 @@ public:
 
 		// Carrier Wave
 		{
-			carrier_f = 8000;
+			carrier_f = 6000;
 
 			int samples_per_bit = sample_rate / bit_rate;
 

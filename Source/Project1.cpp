@@ -9,11 +9,12 @@
 #include <ctime>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -23,6 +24,10 @@
 
 using namespace std::chrono_literals;
 using namespace std::string_literals;
+
+std::mutex mutex;
+
+int total_filled;
 
 class PHY_layer : public juce::AudioIODeviceCallback {
 public:
@@ -38,7 +43,9 @@ public:
 		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
-		int samples_wrote = static_cast<int>(m_send_buffer.pop(outputChannelData[0], numSamples));
+		int samples_wrote = m_send_buffer.pop(outputChannelData[0], numSamples);
+
+		total_filled += samples_wrote;
 
 		for (int i = samples_wrote; i < numSamples; ++i) {
 			outputChannelData[0][i] = 0;
@@ -59,7 +66,7 @@ public:
 		}
 	}
 
-	virtual void audioDeviceStopped() override { }
+	virtual void audioDeviceStopped() override { lock.unlock(); }
 
 	void deliver_bits(const std::vector<int>& bits)
 	{
@@ -75,7 +82,7 @@ public:
 			}
 		}
 
-		append_silence(physical_frame);
+		// append_silence(physical_frame);
 		auto result = m_send_buffer.push(physical_frame);
 		assert(result);
 	}
@@ -131,6 +138,8 @@ private:
 	}
 
 private:
+	std::unique_lock<std::mutex> lock { mutex };
+
 	Athernet::Config& config;
 
 	// Single Producer, Single Consumer-safe
@@ -157,7 +166,7 @@ void* Project1_main_loop(void*)
 
 	auto device_setup = adm.getAudioDeviceSetup();
 	device_setup.sampleRate = 48'000;
-	device_setup.bufferSize = 128;
+	device_setup.bufferSize = 64;
 
 	auto physical_layer = std::make_unique<PHY_layer>();
 
@@ -183,9 +192,11 @@ void* Project1_main_loop(void*)
 	}
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
-	// device_setup.outputDeviceName = "USB Audio Device";
+	device_setup.outputDeviceName = "USB Audio Device";
 
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
+
+	device_setup.outputDeviceName = "USB Audio Device";
 
 	adm.setAudioDeviceSetup(device_setup, false);
 
@@ -200,9 +211,11 @@ void* Project1_main_loop(void*)
 
 	std::fstream fout(NOTEBOOK_DIR + "sent.txt"s, std::ios_base::out);
 
-	for (int i = 0; i < 5; ++i) {
+	adm.addAudioCallback(physical_layer.get());
+
+	for (int i = 0; i < 70; ++i) {
 		std::vector<int> a;
-		for (int i = 0; i < 150; ++i) {
+		for (int i = 0; i < 100; ++i) {
 			if (rand() % 2)
 				a.push_back(1);
 			else
@@ -210,19 +223,21 @@ void* Project1_main_loop(void*)
 		}
 
 		physical_layer->deliver_bits(a);
+		if ((i + 1) % 6 == 0)
+			std::this_thread::sleep_for(500ms);
 		for (const auto& x : a)
 			fout << x << " ";
 	}
 
-	adm.addAudioCallback(physical_layer.get());
-
 	// physical_layer->send_nonsense(500);
 
-	std::this_thread::sleep_for(7s);
+	std::this_thread::sleep_for(9s);
 
 	// getchar();
 
 	adm.removeAudioCallback(physical_layer.get());
+
+	std::lock_guard<std::mutex> lock_guard { mutex };
 
 	static float recv[1000000];
 
@@ -235,6 +250,8 @@ void* Project1_main_loop(void*)
 			fout << recv[i] << " ";
 		}
 	}
+
+	std::cerr << "Total filled: " << total_filled << "\n";
 
 	return NULL;
 }
