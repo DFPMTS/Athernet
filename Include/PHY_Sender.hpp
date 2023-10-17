@@ -14,7 +14,7 @@ public:
 	{
 	}
 
-	void send_frame(std::vector<int> frame)
+	void push_frame(const std::vector<int>& frame)
 	{
 		assert(frame.size() <= config.get_symbol_per_phy_frame());
 		// frame date is zero-padded to a fixed length
@@ -39,7 +39,7 @@ public:
 		assert(result);
 	}
 
-	int fetch_stream(float* buffer, int count)
+	int pop_stream(float* buffer, int count)
 	{
 		return m_send_buffer.pop_with_conversion_to_float(buffer, count);
 	}
@@ -95,7 +95,7 @@ private:
 		}
 	}
 
-	void append_silence(Signal& signal) { append_vec(silence, signal); }
+	void append_silence(Signal& signal) { append_vec(m_silence, signal); }
 
 	void append_vec(const Signal& from, Signal& to)
 	{
@@ -105,6 +105,6 @@ private:
 private:
 	Athernet::RingBuffer<T> m_send_buffer;
 	Athernet::Config& config;
-	Signal silence = Signal(200);
+	Signal m_silence = Signal(200);
 };
 }

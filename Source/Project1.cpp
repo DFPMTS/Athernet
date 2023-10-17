@@ -45,7 +45,7 @@ public:
 		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
-		int samples_wrote = m_sender.fetch_stream(outputChannelData[0], numSamples);
+		int samples_wrote = m_sender.pop_stream(outputChannelData[0], numSamples);
 
 		total_filled += samples_wrote;
 
@@ -70,7 +70,7 @@ public:
 
 	virtual void audioDeviceStopped() override { lock.unlock(); }
 
-	void send_frame(const std::vector<int>& frame) { m_sender.send_frame(frame); }
+	void send_frame(const std::vector<int>& frame) { m_sender.push_frame(frame); }
 
 	std::vector<std::vector<int>> get_frames() { }
 
