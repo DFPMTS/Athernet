@@ -63,7 +63,7 @@ private:
 		}
 	}
 
-	void append_crc8(std::vector<int>& frame, Signal& signal)
+	void append_crc8(const std::vector<int>& frame, Signal& signal)
 	{
 		std::vector<int> bits(8 + config.get_symbol_per_phy_frame() + 8);
 		int size_start = 0;
