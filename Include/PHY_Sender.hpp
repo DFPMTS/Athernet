@@ -2,7 +2,6 @@
 
 #include "Config.hpp"
 #include "RingBuffer.hpp"
-#include <bitset>
 #include <vector>
 namespace Athernet {
 
