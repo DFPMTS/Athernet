@@ -24,7 +24,7 @@ private:
 		}
 	}
 
-	int head_advance(int x)
+	int head_add_offset(int x)
 	{
 		if (m_head + x >= m_capacity) {
 			return m_head + x - m_capacity;
@@ -112,12 +112,16 @@ public:
 		return popped_count;
 	}
 
-	void discard(int count)
+	int discard(int count)
 	{
 		int size_value = m_size.load(std::memory_order_acquire);
 		int discard_count = size_value < count ? size_value : count;
+
 		increment_by(m_head, discard_count);
+
 		m_size.store(size_value - discard_count, std::memory_order_relaxed);
+
+		return discard_count;
 	}
 
 	T& operator[](int x)
@@ -126,7 +130,7 @@ public:
 		return m_data[head_add_offset(x)];
 	}
 
-	int peek_size() const { return m_size.load(std::memory_order_acquire); }
+	int size() const { return m_size.load(std::memory_order_acquire); }
 
 	int capacity() const { return m_capacity; }
 

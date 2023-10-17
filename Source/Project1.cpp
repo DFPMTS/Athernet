@@ -58,7 +58,7 @@ public:
 		// 	++total_samples;
 		// }
 
-		if (m_recv_buffer.peek_size() > 190'0000) {
+		if (m_recv_buffer.size() > 190'0000) {
 			return;
 		}
 

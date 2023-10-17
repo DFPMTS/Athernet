@@ -135,6 +135,8 @@ public:
 
 	int get_symbol_per_phy_frame() const { return symbol_per_phy_frame; }
 
+	int get_preamble_length() const { return preamble_length; }
+
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
 	const std::vector<int>& get_preamble(Tag<int>) const { return preamble_int; }
