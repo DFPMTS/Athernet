@@ -68,6 +68,7 @@ jucer_project_files("Project1/Include"
   .         .         .         "Include/Config.hpp"  
   .         .         .         "Include/RingBuffer.hpp"
   .         .         .         "Include/PHY_Sender.hpp"
+  .         .         .         "Include/PHY_Receiver.hpp"
 )
 
 # --------------------------------Source----------------------------------- #
