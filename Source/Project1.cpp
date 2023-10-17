@@ -1,10 +1,12 @@
 #include "Config.hpp"
 #include "JuceHeader.h"
+#include "PHY_Sender.hpp"
 #include "RingBuffer.hpp"
 #include <algorithm>
 #include <boost/circular_buffer.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
@@ -14,7 +16,7 @@
 
 #define PI acos(-1)
 
-// #define WIN
+#define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -29,7 +31,7 @@ std::mutex mutex;
 
 int total_filled;
 
-class PHY_layer : public juce::AudioIODeviceCallback {
+template <typename T> class PHY_layer : public juce::AudioIODeviceCallback {
 public:
 	PHY_layer()
 		: config { Athernet::Config::get_instance() }
@@ -43,7 +45,7 @@ public:
 		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
-		int samples_wrote = m_send_buffer.pop(outputChannelData[0], numSamples);
+		int samples_wrote = m_sender.fetch_stream(outputChannelData[0], numSamples);
 
 		total_filled += samples_wrote;
 
@@ -56,7 +58,7 @@ public:
 		// 	++total_samples;
 		// }
 
-		if (m_recv_buffer.size() > 500000) {
+		if (m_recv_buffer.peek_size() > 190'0000) {
 			return;
 		}
 
@@ -68,36 +70,7 @@ public:
 
 	virtual void audioDeviceStopped() override { lock.unlock(); }
 
-	void deliver_bits(const std::vector<int>& bits)
-	{
-		std::vector<float> physical_frame;
-		append_preamble(physical_frame);
-		append_uint_16(bits.size(), physical_frame);
-		for (const auto& bit : bits) {
-			assert(bit == 0 || bit == 1);
-			if (bit) {
-				append_1(physical_frame);
-			} else {
-				append_0(physical_frame);
-			}
-		}
-
-		// append_silence(physical_frame);
-		auto result = m_send_buffer.push(physical_frame);
-		assert(result);
-	}
-
-	void send_nonsense(int size)
-	{
-		std::vector<float> nonsense;
-		for (int i = 0; i < size; ++i) {
-			if (rand() & 1)
-				append_1(nonsense);
-			else
-				append_0(nonsense);
-		}
-		m_send_buffer.push(nonsense);
-	}
+	void send_frame(const std::vector<int>& frame) { m_sender.send_frame(frame); }
 
 	std::vector<std::vector<int>> get_frames() { }
 
@@ -106,37 +79,6 @@ public:
 	Athernet::RingBuffer<float> m_recv_buffer;
 
 private:
-	const std::vector<float>& get_preamble() { return config.get_preamble(); }
-
-	const std::vector<float>& get_0() { return config.get_carrier_0(); }
-
-	const std::vector<float>& get_1() { return config.get_carrier_1(); }
-
-	void append_preamble(std::vector<float>& signal) { append_vec(get_preamble(), signal); }
-
-	void append_0(std::vector<float>& signal) { append_vec(get_0(), signal); }
-	void append_1(std::vector<float>& signal) { append_vec(get_1(), signal); }
-
-	void append_uint_16(size_t x, std::vector<float>& signal)
-	{
-		assert(x < 65536);
-
-		for (int i = 0; i < 16; ++i) {
-			if (x & (1ULL << i)) {
-				append_1(signal);
-			} else {
-				append_0(signal);
-			}
-		}
-	}
-
-	void append_silence(std::vector<float>& signal) { append_vec(silence, signal); }
-
-	void append_vec(const std::vector<float>& from, std::vector<float>& to)
-	{
-		std::copy(std::begin(from), std::end(from), std::back_inserter(to));
-	}
-
 private:
 	std::unique_lock<std::mutex> lock { mutex };
 
@@ -146,12 +88,9 @@ private:
 	// boost::lockfree::spsc_queue<float> m_send_buffer;
 	// boost::lockfree::spsc_queue<float> m_recv_buffer;
 
-	Athernet::RingBuffer<float> m_send_buffer;
+	// Athernet::RingBuffer<float> m_send_buffer;
 
-	// not thread safe
-	boost::circular_buffer<float> m_frame_buffer;
-
-	std::vector<float> silence = std::vector<float>(200);
+	Athernet::PHY_Sender<T> m_sender;
 
 	int total_samples = 0;
 };
@@ -166,9 +105,9 @@ void* Project1_main_loop(void*)
 
 	auto device_setup = adm.getAudioDeviceSetup();
 	device_setup.sampleRate = 48'000;
-	device_setup.bufferSize = 64;
+	device_setup.bufferSize = 256;
 
-	auto physical_layer = std::make_unique<PHY_layer>();
+	auto physical_layer = std::make_unique<PHY_layer<int>>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -192,11 +131,11 @@ void* Project1_main_loop(void*)
 	}
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
-	device_setup.outputDeviceName = "USB Audio Device";
+	// device_setup.outputDeviceName = "USB Audio Device";
 
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 
-	device_setup.outputDeviceName = "USB Audio Device";
+	// device_setup.outputDeviceName = "USB Audio Device";
 
 	adm.setAudioDeviceSetup(device_setup, false);
 
@@ -207,31 +146,39 @@ void* Project1_main_loop(void*)
 
 	std::ifstream fin("INPUT.bin");
 
-	srand(time(0));
-
-	std::fstream fout(NOTEBOOK_DIR + "sent.txt"s, std::ios_base::out);
+	srand(static_cast<unsigned int>(time(0)));
 
 	adm.addAudioCallback(physical_layer.get());
+	std::this_thread::sleep_for(1s);
+	{
+		auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
 
-	for (int i = 0; i < 70; ++i) {
-		std::vector<int> a;
-		for (int i = 0; i < 100; ++i) {
-			if (rand() % 2)
-				a.push_back(1);
-			else
-				a.push_back(0);
+		for (int i = 0; i < 10; ++i) {
+			std::vector<int> a = {};
+			// for (int j = 1; j < 15; ++j) {
+			// 	for (int k = 0; k < j; ++k) {
+			// 		if (j % 2)
+			// 			a.push_back(1);
+			// 		else
+			// 			a.push_back(0);
+			// 	}
+			// }
+			for (int j = 0; j < 200; ++j) {
+				if (rand() % 2)
+					a.push_back(1);
+				else
+					a.push_back(0);
+			}
+
+			physical_layer->send_frame(a);
+			for (const auto& x : a)
+				fprintf(sent_fd, "%d\n", x);
+			fflush(sent_fd);
 		}
-
-		physical_layer->deliver_bits(a);
-		if ((i + 1) % 6 == 0)
-			std::this_thread::sleep_for(500ms);
-		for (const auto& x : a)
-			fout << x << " ";
+		fclose(sent_fd);
 	}
-
+	std::this_thread::sleep_for(2s);
 	// physical_layer->send_nonsense(500);
-
-	std::this_thread::sleep_for(9s);
 
 	// getchar();
 
@@ -239,20 +186,38 @@ void* Project1_main_loop(void*)
 
 	std::lock_guard<std::mutex> lock_guard { mutex };
 
-	static float recv[1000000];
+	static float recv[2000000];
 
-	auto size = physical_layer->m_recv_buffer.pop(recv, 1000000);
+	auto size = physical_layer->m_recv_buffer.pop(recv, 2000000);
 
+	std::cerr << "begin\n";
 	{
-		std::ofstream fout(NOTEBOOK_DIR + "received.txt");
+		// * [msvc-only] "c" mode option for WRITE THROUGH
+		/*	Microsoft C/C++ version 7.0 introduces the "c" mode option for the fopen()
+			function. When an application opens a file and specifies the "c" mode, the
+			run-time library writes the contents of the file buffer to disk when the
+			application calls the fflush() or _flushall() function. The "c" mode option is a
+			Microsoft extension and is not part of the ANSI standard for fopen().
+			* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
+		*/
+		auto receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "wc");
+
+		if (!receive_fd) {
+			std::cerr << "Unable to open received.txt!\n";
+		}
 
 		for (int i = 0; i < size; ++i) {
-			fout << recv[i] << " ";
+			fprintf(receive_fd, "%f\n", recv[i]);
+			if (i % 10000 == 0) {
+				fflush(receive_fd);
+			}
 		}
+
+		fclose(receive_fd);
 	}
-
+	std::cerr << "end\n";
 	std::cerr << "Total filled: " << total_filled << "\n";
-
+	// std::this_thread::sleep_for(10s);
 	return NULL;
 }
 
