@@ -96,9 +96,14 @@ public:
 	{
 		int size_value = m_size.load(std::memory_order_acquire);
 		int popped_count = size_value < count ? size_value : count;
-		int SCALE = 32768;
+
 		for (int i = 0; i < popped_count; ++i) {
-			dest[i] = static_cast<float>(m_data[m_head]) / SCALE;
+			if constexpr (std::is_same<T, float>::value) {
+				dest[i] = m_data[m_head]
+			} else {
+				dest[i] = static_cast<float>(m_data[m_head]) / Athernet::FLOAT_INT_SCALE;
+			}
+
 			increment(m_head);
 		}
 

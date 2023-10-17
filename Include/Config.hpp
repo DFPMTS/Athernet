@@ -21,6 +21,9 @@ namespace Athernet {
 // * For tag dispatch
 template <typename T> struct Tag { };
 
+// * Scale from floating point [-1.0,1.0] to int
+constexpr int FLOAT_INT_SCALE = 32768;
+
 // put preambles, ring buffer size ... etc inside.
 // Singleton
 class Config {
@@ -111,6 +114,12 @@ public:
 			fout << symbol_per_phy_frame;
 		}
 	}
+
+	// disable copy constructor / copy assignment operator
+	Config(const Config&) = delete;
+	Config(Config&&) = delete;
+	Config& operator=(const Config&) = delete;
+	Config& operator=(Config&&) = delete;
 
 	~Config() = default;
 
