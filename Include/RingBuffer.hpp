@@ -24,12 +24,12 @@ private:
 		}
 	}
 
-	int head_add_offset(int x)
+	int head_advance(int x)
 	{
-		if (head + x >= m_capacity) {
-			return head + x - m_capacity;
+		if (m_head + x >= m_capacity) {
+			return m_head + x - m_capacity;
 		} else {
-			return head + x;
+			return m_head + x;
 		}
 	}
 
@@ -98,7 +98,7 @@ public:
 		int popped_count = size_value < count ? size_value : count;
 
 		for (int i = 0; i < popped_count; ++i) {
-			if constexpr (std::is_same<T, float>::value) {
+			if constexpr (std::is_floating_point<T>::value) {
 				dest[i] = m_data[m_head]
 			} else {
 				dest[i] = static_cast<float>(m_data[m_head]) / Athernet::FLOAT_INT_SCALE;
