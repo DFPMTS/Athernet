@@ -156,7 +156,7 @@ public:
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
 	const std::vector<int>& get_preamble(Tag<int>) const { return preamble_int; }
 	float get_preamble_energy(Tag<float>) const { return preamble_energy; }
-	float get_preamble_energy(Tag<int>) const { return preamble_int_energy; }
+	int get_preamble_energy(Tag<int>) const { return preamble_int_energy; }
 
 	const std::vector<float>& get_carrier_0(Tag<float>) const { return carrier_0; }
 	const std::vector<int>& get_carrier_0(Tag<int>) const { return carrier_0_int; }
