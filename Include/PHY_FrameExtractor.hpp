@@ -12,7 +12,7 @@ public:
 		, m_recv_buffer { recv_buffer }
 	{
 		running.store(true);
-		worker(&FrameExtractor::frame_extract_loop, this);
+		worker = std::thread(&FrameExtractor::frame_extract_loop, this);
 	};
 
 	~FrameExtractor()
@@ -38,10 +38,10 @@ private:
 					 i < buffer_size - config.get_preamble_length(); ++i, ++start) {
 					T dot_product = 0;
 					T received_energy = 0;
-					for (int i = 0; i < config.get_preamble_length(); ++i) {
+					for (int j = 0; j < config.get_preamble_length(); ++j) {
 						dot_product += mul_small(
-							m_recv_buffer[i], config.get_preamble(Athernet::Tag<T>())[i], Tag<T>());
-						received_energy += mul_small(m_recv_buffer[i], m_recv_buffer[i], Tag<T>());
+							m_recv_buffer[j], config.get_preamble(Athernet::Tag<T>())[j], Tag<T>());
+						received_energy += mul_small(m_recv_buffer[j], m_recv_buffer[j], Tag<T>());
 					}
 					if (dot_product < 0)
 						continue;
@@ -150,7 +150,8 @@ private:
 				}
 			}
 		}
-		for (int i = bits.size() - config.get_crc_length(); i < bits.size(); ++i) {
+		for (int i = static_cast<int>(bits.size()) - config.get_crc_length();
+			 i < static_cast<int>(bits.size()); ++i) {
 			if (bits[i]) {
 				return false;
 			}
@@ -176,9 +177,9 @@ private:
 			 i += config.get_symbol_length(), start += config.get_symbol_length()) {
 
 			T dot_product = 0;
-			for (int i = 0; i < config.get_symbol_length(); ++i) {
+			for (int j = 0; j < config.get_symbol_length(); ++j) {
 				dot_product
-					+= mul_small(m_recv_buffer[i], config.get_carrier_0(Athernet::Tag<T>())[i], Tag<T>());
+					+= mul_small(m_recv_buffer[j], config.get_carrier_0(Athernet::Tag<T>())[j], Tag<T>());
 			}
 			if (dot_product > 0) {
 				bits.push_back(0);
