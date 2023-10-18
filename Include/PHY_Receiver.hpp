@@ -1,52 +1,39 @@
 #pragma once
 #include "Config.hpp"
+#include "PHY_FrameExtractor.hpp"
 #include "RingBuffer.hpp"
-#include <boost/>
+#include <atomic>
+#include <thread>
 #include <vector>
 
 namespace Athernet {
 
 template <typename T> class PHY_Receiver {
-	using Signal = std::vector<T>;
-
+public:
 	PHY_Receiver()
 		: config { Athernet::Config::get_instance() }
+		, frame_extractor(m_recv_buffer)
 	{
 	}
 
-	void push_stream(float* buffer, int count)
+	void push_stream(const float* buffer, int count)
 	{
 		bool result = true;
 		for (int i = 0; i < count; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
 				m_recv_buffer.push(buffer[i]);
 			} else {
-				result = result and m_recv_buffer.push(static_cast<T>(buffer[i] * Athernet::FLOAT_INT_SCALE));
+				result = result && m_recv_buffer.push(static_cast<T>(buffer[i] * Athernet::FLOAT_INT_SCALE));
 			}
 		}
 		assert(result);
 	}
 
-	std::vector<std::vector<T>> pop_frame()
-	{
-		if (state == PhyRecvState::WAIT_HEADER) {
-			for (int i = 0; i < m_recv_buffer.size() - config.get_preamble_length(); ++i) { }
-		} else if (state == PhyRecvState::GET_DATA) {
-		}
-	}
+	std::vector<std::vector<T>> pop_frame() { }
 
 private:
-	enum class PhyRecvState { WAIT_HEADER, GET_DATA };
-
-	class FrameExtractor {
-		FrameExtractor() {};
-		~FrameExtractor() {};
-	};
-
 	Athernet::Config& config;
 	Athernet::RingBuffer<T> m_recv_buffer;
-	FrameExtractor frame_extractor;
-	PhyRecvState state = PhyRecvState::WAIT_HEADER;
+	FrameExtractor<T> frame_extractor;
 };
-
 }
