@@ -72,10 +72,15 @@ private:
 					saved_start = 0;
 					state = PhyRecvState::GET_DATA;
 				} else {
-					// discard everything until max_pos
-					m_recv_buffer.discard(max_pos);
-					max_pos = 0;
-					start -= max_pos;
+					if (max_pos != -1) {
+						// discard everything until max_pos
+						m_recv_buffer.discard(max_pos);
+						max_pos = 0;
+						start -= max_pos;
+					} else {
+						m_recv_buffer.discard(start);
+						start = 0;
+					}
 				}
 
 			} else if (state == PhyRecvState::GET_DATA) {
@@ -90,7 +95,7 @@ private:
 					if (bits[i])
 						payload_length += (1 << i);
 				}
-
+				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit()) {
 					state = PhyRecvState::WAIT_HEADER;
@@ -263,19 +268,7 @@ private:
 		upper = x_upper + y_upper + ((x_lower_upper31 + y_lower_upper31) >> 31);
 	}
 
-	T add_large(T x, T y, Tag<float>)
-	{
-		auto [x_upper, x_lower] = x;
-		auto [y_upper, y_lower] = y;
-		uint32_t upper = 0, lower = 0;
-		lower = x_lower + y_lower;
-		uint32_t x_lower_upper31 = x_lower >> 1;
-		uint32_t y_lower_upper31 = y_lower >> 1;
-		uint32_t x_lower_low1 = x_lower & 1;
-		uint32_t y_lower_low1 = y_lower & 1;
-
-		upper = x_upper + y_upper + ((x_lower_upper31 + y_lower_upper31) >> 31);
-	}
+	T add_large(T x, T y, Tag<float>) { return x + y; }
 
 	bool greater_than(SoftUInt64 x, SoftUInt64 y, Tag<int>)
 	{
