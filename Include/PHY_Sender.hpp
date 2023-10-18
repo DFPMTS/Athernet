@@ -65,7 +65,7 @@ private:
 		std::vector<int> bits(8 + frame.size() + 8);
 		int size_start = 0;
 		int data_start = 8;
-		int crc_start = 8 + frame.size();
+		int crc_start = 8 + static_cast<int>(frame.size());
 
 		for (int i = 0; i < 8; ++i) {
 			if (frame.size() & (1ULL << i)) {

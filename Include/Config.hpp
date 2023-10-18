@@ -150,7 +150,7 @@ public:
 
 	int get_preamble_length() const { return preamble_length; }
 
-	int get_crc_length() const { return crc.size() - 1; }
+	int get_crc_length() const { return static_cast<int>(crc.size()) - 1; }
 
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
@@ -164,7 +164,7 @@ public:
 	const std::vector<float>& get_carrier_1(Tag<float>) const { return carrier_1; }
 	const std::vector<int>& get_carrier_1(Tag<int>) const { return carrier_1_int; }
 
-	int get_symbol_length() const { return carrier_0.size(); }
+	int get_symbol_length() const { return static_cast<int>(carrier_0.size()); }
 
 	const std::vector<int>& get_crc() const { return crc; }
 
