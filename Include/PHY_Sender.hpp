@@ -16,7 +16,7 @@ public:
 
 	void push_frame(const std::vector<int>& frame)
 	{
-		assert(frame.size() <= config.get_symbol_per_phy_frame());
+		assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
 		// frame date is zero-padded to a fixed length
 		Signal signal;
 		append_preamble(signal);
@@ -28,9 +28,6 @@ public:
 			} else {
 				append_0(signal);
 			}
-		}
-		for (int i = static_cast<int>(frame.size()); i < config.get_symbol_per_phy_frame(); ++i) {
-			append_0(signal);
 		}
 		append_crc8(frame, signal);
 		append_silence(signal);
@@ -65,10 +62,10 @@ private:
 
 	void append_crc8(const std::vector<int>& frame, Signal& signal)
 	{
-		std::vector<int> bits(8 + config.get_symbol_per_phy_frame() + 8);
+		std::vector<int> bits(8 + frame.size() + 8);
 		int size_start = 0;
 		int data_start = 8;
-		int crc_start = 8 + config.get_symbol_per_phy_frame();
+		int crc_start = 8 + frame.size();
 
 		for (int i = 0; i < 8; ++i) {
 			if (frame.size() & (1ULL << i)) {
@@ -82,7 +79,7 @@ private:
 		for (int i = 0; i < crc_start; ++i) {
 			if (bits[i]) {
 				for (int offset = 0; offset < 9; ++offset) {
-					bits[i + offset] ^= config.get_crc8()[offset];
+					bits[i + offset] ^= config.get_crc()[offset];
 				}
 			}
 		}
