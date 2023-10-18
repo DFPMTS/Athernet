@@ -69,6 +69,7 @@ jucer_project_files("Project1/Include"
   .         .         .         "Include/RingBuffer.hpp"
   .         .         .         "Include/PHY_Sender.hpp"
   .         .         .         "Include/PHY_Receiver.hpp"
+  .         .         .         "Include/PHY_FrameExtractor.hpp"
 )
 
 # --------------------------------Source----------------------------------- #
