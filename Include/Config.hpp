@@ -71,8 +71,19 @@ public:
 					* ((preamble_f1 - preamble_f2) * (t * t / T) + (2 * preamble_f2 - preamble_f1) * t
 						+ (preamble_f1 - preamble_f2) * T / 2))));
 			}
+
+			preamble_energy = 0;
+			for (const auto& x : preamble) {
+				preamble_energy += x * x;
+			}
+
 			for (const auto& x : preamble) {
 				preamble_int.push_back(static_cast<int>(x * SCALE));
+			}
+
+			preamble_int_energy = 0;
+			for (const auto& x : preamble_int) {
+				preamble_int_energy += x * x;
 			}
 		}
 
@@ -111,7 +122,7 @@ public:
 		}
 		{
 			std::ofstream fout(NOTEBOOK_DIR + "packet_length.txt"s);
-			fout << symbol_per_phy_frame;
+			fout << phy_frame_payload_symbol_limit;
 		}
 	}
 
@@ -133,13 +144,19 @@ public:
 	// get buffer size for physical layer
 	int get_physical_buffer_size() const { return physical_buffer_size; }
 
-	int get_symbol_per_phy_frame() const { return symbol_per_phy_frame; }
+	int get_phy_frame_payload_symbol_limit() const { return phy_frame_payload_symbol_limit; }
+
+	int get_phy_frame_length_num_bits() const { return phy_frame_length_num_bits; }
 
 	int get_preamble_length() const { return preamble_length; }
+
+	int get_crc_length() const { return crc.size() - 1; }
 
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
 	const std::vector<int>& get_preamble(Tag<int>) const { return preamble_int; }
+	float get_preamble_energy(Tag<float>) const { return preamble_energy; }
+	float get_preamble_energy(Tag<int>) const { return preamble_int_energy; }
 
 	const std::vector<float>& get_carrier_0(Tag<float>) const { return carrier_0; }
 	const std::vector<int>& get_carrier_0(Tag<int>) const { return carrier_0_int; }
@@ -147,7 +164,9 @@ public:
 	const std::vector<float>& get_carrier_1(Tag<float>) const { return carrier_1; }
 	const std::vector<int>& get_carrier_1(Tag<int>) const { return carrier_1_int; }
 
-	const std::vector<int>& get_crc8() const { return crc8; }
+	int get_symbol_length() const { return carrier_0.size(); }
+
+	const std::vector<int>& get_crc() const { return crc; }
 
 private:
 	int bit_rate;
@@ -158,9 +177,12 @@ private:
 	int preamble_f1;
 	int preamble_f2;
 	std::vector<float> preamble;
+	float preamble_energy;
 	std::vector<int> preamble_int;
+	int preamble_int_energy;
 
-	int symbol_per_phy_frame = 200;
+	int phy_frame_payload_symbol_limit = 200;
+	int phy_frame_length_num_bits = 8;
 
 	int carrier_f;
 	std::vector<float> carrier_0;
@@ -169,7 +191,7 @@ private:
 	std::vector<int> carrier_1_int;
 
 	// ! REVERSED for simplicity
-	std::vector<int> crc8 = { 1, 1, 1, 0, 1, 0, 1, 0, 1 };
+	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
 	int physical_buffer_size = 200'0000;
 };
