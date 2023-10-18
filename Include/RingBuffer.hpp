@@ -99,7 +99,7 @@ public:
 
 		for (int i = 0; i < popped_count; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
-				dest[i] = m_data[m_head]
+				dest[i] = m_data[m_head];
 			} else {
 				dest[i] = static_cast<float>(m_data[m_head]) / Athernet::FLOAT_INT_SCALE;
 			}
