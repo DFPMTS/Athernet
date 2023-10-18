@@ -12,7 +12,7 @@ public:
 		, m_recv_buffer { recv_buffer }
 	{
 		running.store(true);
-		std::thread(&FrameExtractor::frame_extract_loop, this);
+		worker(&FrameExtractor::frame_extract_loop, this);
 	};
 
 	~FrameExtractor()
