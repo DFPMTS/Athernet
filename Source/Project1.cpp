@@ -1,5 +1,6 @@
 #include "Config.hpp"
 #include "JuceHeader.h"
+#include "PHY_Receiver.hpp"
 #include "PHY_Sender.hpp"
 #include "RingBuffer.hpp"
 #include <algorithm>
@@ -53,19 +54,7 @@ public:
 			outputChannelData[0][i] = 0;
 		}
 
-		// for (int i = 0; i < numSamples; ++i) {
-		// 	outputChannelData[0][i] += sin(total_samples * 2 * PI * 7000 / 48000);
-		// 	++total_samples;
-		// }
-
-		if (m_recv_buffer.size() > 190'0000) {
-			return;
-		}
-
-		for (int i = 0; i < numSamples; ++i) {
-			auto res = m_recv_buffer.push(inputChannelData[0][i]);
-			assert(res);
-		}
+		m_receiver.push_stream(inputChannelData[0], numSamples);
 	}
 
 	virtual void audioDeviceStopped() override { lock.unlock(); }
@@ -76,7 +65,7 @@ public:
 
 	~PHY_layer() { }
 
-	Athernet::RingBuffer<float> m_recv_buffer;
+	// Athernet::RingBuffer<float> m_recv_buffer;
 
 private:
 private:
@@ -89,6 +78,8 @@ private:
 	// boost::lockfree::spsc_queue<float> m_recv_buffer;
 
 	// Athernet::RingBuffer<float> m_send_buffer;
+
+	Athernet::PHY_Receiver<T> m_receiver;
 
 	Athernet::PHY_Sender<T> m_sender;
 
@@ -153,7 +144,7 @@ void* Project1_main_loop(void*)
 	{
 		auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
 
-		for (int i = 0; i < 10; ++i) {
+		for (int i = 0; i < 1; ++i) {
 			std::vector<int> a = {};
 			// for (int j = 1; j < 15; ++j) {
 			// 	for (int k = 0; k < j; ++k) {
@@ -164,7 +155,7 @@ void* Project1_main_loop(void*)
 			// 	}
 			// }
 			for (int j = 0; j < 200; ++j) {
-				if (rand() % 2)
+				if (j % 2)
 					a.push_back(1);
 				else
 					a.push_back(0);
@@ -177,46 +168,46 @@ void* Project1_main_loop(void*)
 		}
 		fclose(sent_fd);
 	}
-	std::this_thread::sleep_for(2s);
+
 	// physical_layer->send_nonsense(500);
 
-	// getchar();
+	getchar();
 
 	adm.removeAudioCallback(physical_layer.get());
 
 	std::lock_guard<std::mutex> lock_guard { mutex };
 
-	static float recv[2000000];
+	// static float recv[2000000];
 
-	auto size = physical_layer->m_recv_buffer.pop(recv, 2000000);
+	// auto size = physical_layer->m_recv_buffer.pop(recv, 2000000);
 
-	std::cerr << "begin\n";
-	{
-		// * [msvc-only] "c" mode option for WRITE THROUGH
-		/*	Microsoft C/C++ version 7.0 introduces the "c" mode option for the fopen()
-			function. When an application opens a file and specifies the "c" mode, the
-			run-time library writes the contents of the file buffer to disk when the
-			application calls the fflush() or _flushall() function. The "c" mode option is a
-			Microsoft extension and is not part of the ANSI standard for fopen().
-			* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
-		*/
-		auto receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "wc");
+	// std::cerr << "begin\n";
+	// {
+	// 	// * [msvc-only] "c" mode option for WRITE THROUGH
+	// 	/*	Microsoft C/C++ version 7.0 introduces the "c" mode option for the fopen()
+	// 		function. When an application opens a file and specifies the "c" mode, the
+	// 		run-time library writes the contents of the file buffer to disk when the
+	// 		application calls the fflush() or _flushall() function. The "c" mode option is a
+	// 		Microsoft extension and is not part of the ANSI standard for fopen().
+	// 		* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
+	// 	*/
+	// 	auto receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "wc");
 
-		if (!receive_fd) {
-			std::cerr << "Unable to open received.txt!\n";
-		}
+	// 	if (!receive_fd) {
+	// 		std::cerr << "Unable to open received.txt!\n";
+	// 	}
 
-		for (int i = 0; i < size; ++i) {
-			fprintf(receive_fd, "%f\n", recv[i]);
-			if (i % 10000 == 0) {
-				fflush(receive_fd);
-			}
-		}
+	// 	for (int i = 0; i < size; ++i) {
+	// 		fprintf(receive_fd, "%f\n", recv[i]);
+	// 		if (i % 10000 == 0) {
+	// 			fflush(receive_fd);
+	// 		}
+	// 	}
 
-		fclose(receive_fd);
-	}
-	std::cerr << "end\n";
-	std::cerr << "Total filled: " << total_filled << "\n";
+	// 	fclose(receive_fd);
+	// }
+	// std::cerr << "end\n";
+	// std::cerr << "Total filled: " << total_filled << "\n";
 	// std::this_thread::sleep_for(10s);
 	return NULL;
 }
