@@ -47,7 +47,6 @@ public:
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
 		int samples_wrote = m_sender.pop_stream(outputChannelData[0], numSamples);
-
 		total_filled += samples_wrote;
 
 		for (int i = samples_wrote; i < numSamples; ++i) {
@@ -98,7 +97,7 @@ void* Project1_main_loop(void*)
 	device_setup.sampleRate = 48'000;
 	device_setup.bufferSize = 256;
 
-	auto physical_layer = std::make_unique<PHY_layer<int>>();
+	auto physical_layer = std::make_unique<PHY_layer<float>>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -140,11 +139,11 @@ void* Project1_main_loop(void*)
 	srand(static_cast<unsigned int>(time(0)));
 
 	adm.addAudioCallback(physical_layer.get());
-	std::this_thread::sleep_for(1s);
+	// std::this_thread::sleep_for(1s);
 	{
 		auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
 
-		for (int i = 0; i < 1; ++i) {
+		for (int i = 0; i < 100; ++i) {
 			std::vector<int> a = {};
 			// for (int j = 1; j < 15; ++j) {
 			// 	for (int k = 0; k < j; ++k) {
@@ -154,7 +153,7 @@ void* Project1_main_loop(void*)
 			// 			a.push_back(0);
 			// 	}
 			// }
-			for (int j = 0; j < 200; ++j) {
+			for (int j = 0; j < 10; ++j) {
 				if (j % 2)
 					a.push_back(1);
 				else
@@ -170,42 +169,17 @@ void* Project1_main_loop(void*)
 	}
 
 	// physical_layer->send_nonsense(500);
-
-	getchar();
+	std::this_thread::sleep_for(5s);
 
 	adm.removeAudioCallback(physical_layer.get());
-
-	std::lock_guard<std::mutex> lock_guard { mutex };
+	// std::lock_guard<std::mutex> lock_guard { mutex };
 
 	// static float recv[2000000];
 
 	// auto size = physical_layer->m_recv_buffer.pop(recv, 2000000);
 
 	// std::cerr << "begin\n";
-	// {
-	// 	// * [msvc-only] "c" mode option for WRITE THROUGH
-	// 	/*	Microsoft C/C++ version 7.0 introduces the "c" mode option for the fopen()
-	// 		function. When an application opens a file and specifies the "c" mode, the
-	// 		run-time library writes the contents of the file buffer to disk when the
-	// 		application calls the fflush() or _flushall() function. The "c" mode option is a
-	// 		Microsoft extension and is not part of the ANSI standard for fopen().
-	// 		* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
-	// 	*/
-	// 	auto receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "wc");
 
-	// 	if (!receive_fd) {
-	// 		std::cerr << "Unable to open received.txt!\n";
-	// 	}
-
-	// 	for (int i = 0; i < size; ++i) {
-	// 		fprintf(receive_fd, "%f\n", recv[i]);
-	// 		if (i % 10000 == 0) {
-	// 			fflush(receive_fd);
-	// 		}
-	// 	}
-
-	// 	fclose(receive_fd);
-	// }
 	// std::cerr << "end\n";
 	// std::cerr << "Total filled: " << total_filled << "\n";
 	// std::this_thread::sleep_for(10s);
@@ -215,6 +189,16 @@ void* Project1_main_loop(void*)
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
 	std::ios::sync_with_stdio(false);
+
+	// Athernet::PHY_Receiver<float> test;
+	// std::ifstream fin(NOTEBOOK_DIR + "received.txt");
+	// float x[1];
+	// while (fin >> x[0]) {
+	// 	test.push_stream(x, 1);
+	// }
+
+	// return 0;
+
 	auto message_manager = juce::MessageManager::getInstance();
 	message_manager->callFunctionOnMessageThread(Project1_main_loop, NULL);
 

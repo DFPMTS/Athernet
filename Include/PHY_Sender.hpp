@@ -69,13 +69,13 @@ private:
 
 		for (int i = 0; i < 8; ++i) {
 			if (frame.size() & (1ULL << i)) {
-				bits[size_start + i] = 0;
+				bits[size_start + i] = 1;
 			}
 		}
 		for (int i = 0; i < frame.size(); ++i) {
 			bits[data_start + i] = frame[i];
 		}
-		// zero-padded
+
 		for (int i = 0; i < crc_start; ++i) {
 			if (bits[i]) {
 				for (int offset = 0; offset < 9; ++offset) {
@@ -83,6 +83,7 @@ private:
 				}
 			}
 		}
+
 		for (int i = 0; i < 8; ++i) {
 			if (bits[crc_start + i]) {
 				append_1(signal);

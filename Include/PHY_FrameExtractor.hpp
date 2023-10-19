@@ -12,37 +12,66 @@ public:
 		, m_recv_buffer { recv_buffer }
 	{
 		running.store(true);
+		start = 0;
 		worker = std::thread(&FrameExtractor::frame_extract_loop, this);
+		std::cerr << "Worker Started\n";
 	};
 
 	~FrameExtractor()
 	{
+		std::cerr << "Called\n";
 		running.store(false);
 		worker.join();
+		std::cerr << m_recv_buffer.show_head() << "\n";
+		std::cerr << "End\n";
 	};
 
 private:
 	using SoftUInt64 = std::pair<uint32_t, uint32_t>;
 	using Bits = std::vector<int>;
 
+	double to_double(SoftUInt64 x) { return (double)((((unsigned long long)x.first) << 32) + x.second); }
+
 	void frame_extract_loop()
 	{
 		T max_val = 0;
 		int max_pos = -1;
-		bool confirmed = false;
 		int saved_start = 0;
-
+		int symbols_to_collect = 0;
+		PhyRecvState next_state = PhyRecvState::INVALID_STATE;
+		Bits length;
+		Bits bits;
+		std::vector<int> collect;
+		int received = 0;
+		int good = 0;
+		int fail = 0;
 		while (running.load()) {
 			if (state == PhyRecvState::WAIT_HEADER) {
+				// std::cerr << " running.... \n";
+				// if (start > m_recv_buffer.size() - config.get_preamble_length()) {
+				// 	++wait;
+				// 	continue;
+				// }
+
+				// std::cerr << start << " " << m_recv_buffer.size() << " " << config.get_preamble_length()
+				// 		  << "\n";
+
+				// std::cerr << "Running  " << running.load() << "\n";
+				// std::cerr << "    head " << m_recv_buffer.show_head() << "\n";
+				// collect.push_back(m_recv_buffer.show_head());
+				bool confirmed = false;
+
 				for (int i = start, buffer_size = m_recv_buffer.size();
-					 i < buffer_size - config.get_preamble_length(); ++i, ++start) {
+					 i <= buffer_size - config.get_preamble_length(); ++i, ++start) {
 					T dot_product = 0;
 					T received_energy = 0;
 					for (int j = 0; j < config.get_preamble_length(); ++j) {
 						dot_product += mul_small(
-							m_recv_buffer[j], config.get_preamble(Athernet::Tag<T>())[j], Tag<T>());
-						received_energy += mul_small(m_recv_buffer[j], m_recv_buffer[j], Tag<T>());
+							m_recv_buffer[i + j], config.get_preamble(Athernet::Tag<T>())[j], Tag<T>());
+
+						received_energy += mul_small(m_recv_buffer[i + j], m_recv_buffer[i + j], Tag<T>());
 					}
+
 					if (dot_product < 0)
 						continue;
 					// now we need to square dot_product, use two int32 to store result
@@ -52,11 +81,22 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_4(dot_product_square, Tag<T>()), preamble_received_energy_product,
+					if (fail) {
+						std::cerr << "Now head " << m_recv_buffer.show_head() << " " << m_recv_buffer.size()
+								  << "\n";
+						std::cerr << dot_product_square / preamble_received_energy_product << "\n";
+						fail--;
+					}
+
+					if (greater_than(mul_6(dot_product_square, Tag<T>()), preamble_received_energy_product,
 							Tag<T>())) {
 						if (dot_product > max_val) {
 							max_val = dot_product;
 							max_pos = i;
+							std::cerr << "Greater:  " << max_val << "\n";
+							std::cerr << dot_product_square / preamble_received_energy_product << "\n";
+							std::cerr << dot_product << " " << received_energy << " "
+									  << config.get_preamble_energy(Tag<T>()) << "\n";
 						}
 					}
 
@@ -67,10 +107,20 @@ private:
 				}
 
 				if (confirmed) {
+					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
+					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					collect.push_back(0);
+					collect.push_back(0);
+					collect.push_back(m_recv_buffer.show_head());
+					collect.push_back(0);
+					collect.push_back(0);
 					start = 0;
 					saved_start = 0;
-					state = PhyRecvState::GET_DATA;
+					max_pos = -1;
+					max_val = 0;
+					fail = 0;
+					state = PhyRecvState::GET_LENGTH;
 				} else {
 					if (max_pos != -1) {
 						// discard everything until max_pos
@@ -82,96 +132,127 @@ private:
 						start = 0;
 					}
 				}
+			} else if (state == PhyRecvState::GET_LENGTH) {
+				bits.clear();
+				symbols_to_collect = config.get_phy_frame_length_num_bits();
 
-			} else if (state == PhyRecvState::GET_DATA) {
-				Bits length, bits;
+				state = PhyRecvState::COLLECT_BITS;
+				next_state = PhyRecvState::GET_PAYLOAD;
+			} else if (state == PhyRecvState::GET_PAYLOAD) {
+				static int counter = 0;
+				std::cerr << "Begin GetDATA" << (++counter) << "\n";
 
-				// first bits is the "adviced" payload length
-				// collect payload length
-				collect_bits(config.get_phy_frame_length_num_bits(), length);
-
+				// move to length
+				std::swap(length, bits);
 				int payload_length = 0;
 				for (int i = 0; i < length.size(); ++i) {
-					if (bits[i])
+					if (length[i])
 						payload_length += (1 << i);
 				}
 				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit()) {
 					state = PhyRecvState::WAIT_HEADER;
+					fail = 10;
 					// restore start
 					start = saved_start;
+					// discard
+					std::cerr << "                 ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
 				// collect data and crc residual
-				collect_bits(payload_length + config.get_crc_length(), bits);
+
+				bits.clear();
+				symbols_to_collect = payload_length + config.get_crc_residual_length();
+				state = PhyRecvState::COLLECT_BITS;
+				next_state = PhyRecvState::CHECK_PAYLOAD;
+			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
+
+				// ! Just show it
+				for (const auto& x : bits) {
+					std::cerr << x;
+				}
+				std::cerr << "\n";
 
 				if (crc_check(length, bits)) {
 					// good to go
-					for (int i = 0; i < config.get_crc_length(); ++i) {
+					for (int i = 0; i < config.get_crc_residual_length(); ++i) {
 						bits.pop_back();
 					}
-					// ! Just show it
-					for (const auto& x : bits) {
-						std::cerr << x;
-					}
-					std::cerr << "\n";
+					good++;
+					std::cerr << "     Good:   " << good << "\n";
+
 				} else {
 					// discard
+					fail = 10;
+					std::cerr << "                 ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 
 				state = PhyRecvState::WAIT_HEADER;
+			} else if (state == PhyRecvState::COLLECT_BITS) {
+				if (!symbols_to_collect) {
+					state = next_state;
+				}
+				symbols_to_collect -= to_bits(symbols_to_collect, bits);
+			} else if (state == PhyRecvState::INVALID_STATE) {
+				std::cerr << "[PHY_FrameExtractor] Invalid state!\n";
+				assert(0);
 			}
 		}
+		for (int i = 0; i < collect.size(); ++i)
+			std::cerr << collect[i] << " ";
+		std::cerr << "\n";
+
+		// if constexpr (Athernet::DUMP_RECEIVED) {
+		std::cerr << "--------[FrameExtractor]--------\n";
+		std::cerr << "     Received:      " << received << "\n";
+		std::cerr << "     Bad:           " << received - good << "\n";
+		// }
 	}
 
 	bool crc_check(Bits length, Bits bits)
 	{
-		for (int i = 0; i < config.get_crc_length(); ++i) {
+		for (int i = 0; i < config.get_crc_residual_length(); ++i) {
 			length.push_back(0);
 		}
-		for (int i = 0; i < length.size(); ++i) {
+		for (int i = 0; i < length.size() - config.get_crc_residual_length(); ++i) {
 			if (length[i])
-				for (int j = 0; j < config.get_crc_length(); ++j) {
+				for (int j = 0; j < config.get_crc().size(); ++j) {
 					length[i + j] ^= config.get_crc()[j];
 				}
 		}
 
-		for (int i = 0; i < config.get_crc_length(); ++i) {
-			bits[i] ^= length[length.size() - config.get_crc_length() + i];
+		for (int i = 0; i < config.get_crc_residual_length(); ++i) {
+			bits[i] ^= length[length.size() - config.get_crc_residual_length() + i];
 		}
 
-		for (int i = 0; i < bits.size() - config.get_crc_length(); ++i) {
+		for (int i = 0; i < bits.size() - config.get_crc_residual_length(); ++i) {
 			if (bits[i]) {
-				for (int j = 0; j < config.get_crc_length(); ++j) {
+				for (int j = 0; j < config.get_crc().size(); ++j) {
 					bits[i + j] ^= config.get_crc()[j];
 				}
 			}
 		}
-		for (int i = static_cast<int>(bits.size()) - config.get_crc_length();
+
+		bool is_zero = true;
+		for (int i = static_cast<int>(bits.size()) - config.get_crc_residual_length();
 			 i < static_cast<int>(bits.size()); ++i) {
+			std::cerr << bits[i];
 			if (bits[i]) {
-				return false;
+				is_zero = false;
 			}
 		}
-		return true;
-	}
-
-	void collect_bits(int symbols_to_collect, Bits& bits)
-	{
-		symbols_to_collect -= to_bits(symbols_to_collect, bits);
-		while (symbols_to_collect) {
-			std::this_thread::yield();
-			symbols_to_collect -= to_bits(symbols_to_collect, bits);
-		}
+		return is_zero;
 	}
 
 	int to_bits(int count, Bits& bits)
 	{
 		int rightmost_pos = std::min(m_recv_buffer.size() - config.get_symbol_length(),
-			start + mul_small(config.get_symbol_length(), count, Tag<int>()));
+			start + mul_small(config.get_symbol_length(), count));
 		int converted_count = 0;
 		for (int i = start; i < rightmost_pos;
 			 i += config.get_symbol_length(), start += config.get_symbol_length()) {
@@ -179,7 +260,7 @@ private:
 			T dot_product = 0;
 			for (int j = 0; j < config.get_symbol_length(); ++j) {
 				dot_product
-					+= mul_small(m_recv_buffer[j], config.get_carrier_0(Athernet::Tag<T>())[j], Tag<T>());
+					+= mul_small(m_recv_buffer[i + j], config.get_carrier_0(Athernet::Tag<T>())[j], Tag<T>());
 			}
 			if (dot_product > 0) {
 				bits.push_back(0);
@@ -192,16 +273,40 @@ private:
 		return converted_count;
 	}
 
+	int mul_small(int x, int y)
+	{
+
+		if (x < y)
+			std::swap(x, y);
+		int ret = 0;
+		if (y < 0) {
+			x = -x;
+			y = -y;
+		}
+		while (y) {
+			if (y & 1)
+				ret += x;
+			x <<= 1;
+			y >>= 1;
+		}
+		return ret;
+	}
+
 	T mul_small(T x, T y, Tag<int>)
 	{
 
 		if (x < y)
 			std::swap(x, y);
 		T ret = 0;
+		if (y < 0) {
+			x = -x;
+			y = -y;
+		}
 		while (y) {
 			if (y & 1)
 				ret += x;
 			x <<= 1;
+			y >>= 1;
 		}
 		return ret;
 	}
@@ -253,20 +358,22 @@ private:
 		return std::make_pair(upper, lower);
 	}
 
-	SoftUInt64 mul_large(T x, T y, Tag<float>) { return x * y; }
+	float mul_large(T x, T y, Tag<float>) { return x * y; }
 
 	SoftUInt64 add_large(SoftUInt64 x, SoftUInt64 y, Tag<int>)
 	{
 		auto [x_upper, x_lower] = x;
 		auto [y_upper, y_lower] = y;
 		uint32_t upper = 0, lower = 0;
-		lower = x_lower + y_lower;
+
 		uint32_t x_lower_upper31 = x_lower >> 1;
 		uint32_t y_lower_upper31 = y_lower >> 1;
 		uint32_t x_lower_low1 = x_lower & 1;
 		uint32_t y_lower_low1 = y_lower & 1;
 
+		lower = x_lower + y_lower;
 		upper = x_upper + y_upper + ((x_lower_upper31 + y_lower_upper31) >> 31);
+		return std::make_pair(upper, lower);
 	}
 
 	T add_large(T x, T y, Tag<float>) { return x + y; }
@@ -278,11 +385,22 @@ private:
 
 	bool greater_than(T x, T y, Tag<float>) { return x > y; }
 
-	SoftUInt64 mul_4(SoftUInt64 x, Tag<int>) { return std::make_pair(x.first << 2, x.second << 2); }
+	SoftUInt64 mul_6(SoftUInt64 x, Tag<int>)
+	{
+		return add_large(std::make_pair(x.first << 2, x.second << 2),
+			std::make_pair(x.first << 1, x.second << 1), Tag<int>());
+	}
 
-	SoftUInt64 mul_4(T x, Tag<float>) { return x * 4; }
+	float mul_6(T x, Tag<float>) { return x * 6; }
 
-	enum class PhyRecvState { WAIT_HEADER, GET_DATA };
+	enum class PhyRecvState {
+		WAIT_HEADER,
+		GET_LENGTH,
+		GET_PAYLOAD,
+		CHECK_PAYLOAD,
+		COLLECT_BITS,
+		INVALID_STATE
+	};
 
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_recv_buffer;

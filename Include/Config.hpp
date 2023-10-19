@@ -21,8 +21,15 @@ namespace Athernet {
 // * For tag dispatch
 template <typename T> struct Tag { };
 
-// * Scale from floating point [-1.0,1.0] to int
-constexpr int FLOAT_INT_SCALE = 32768;
+// * the scale of pre-calculated carrier & preamble
+constexpr int SEND_FLOAT_INT_SCALE = 1000;
+
+// * Scale from floating point [-1.0, 1.0] to int
+// * In practice, the range is within [-0.01, 0.01]
+constexpr int RECV_FLOAT_INT_SCALE = 100'0;
+
+// * If dump received
+constexpr int DUMP_RECEIVED = 1;
 
 // put preambles, ring buffer size ... etc inside.
 // Singleton
@@ -34,11 +41,10 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 3000;
+		bit_rate = 2000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
-		int SCALE = 32768;
 		// Preamble
 		{
 			// * Preamble (chirp) Parameters
@@ -78,7 +84,7 @@ public:
 			}
 
 			for (const auto& x : preamble) {
-				preamble_int.push_back(static_cast<int>(x * SCALE));
+				preamble_int.push_back(static_cast<int>(x * SEND_FLOAT_INT_SCALE));
 			}
 
 			preamble_int_energy = 0;
@@ -99,8 +105,8 @@ public:
 			}
 
 			for (int i = 0; i < samples_per_bit; ++i) {
-				carrier_0_int.push_back(static_cast<int>(SCALE * carrier_0[i]));
-				carrier_1_int.push_back(static_cast<int>(SCALE * carrier_1[i]));
+				carrier_0_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_0[i]));
+				carrier_1_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_1[i]));
 			}
 		}
 
@@ -150,7 +156,7 @@ public:
 
 	int get_preamble_length() const { return preamble_length; }
 
-	int get_crc_length() const { return static_cast<int>(crc.size()) - 1; }
+	int get_crc_residual_length() const { return static_cast<int>(crc.size()) - 1; }
 
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }

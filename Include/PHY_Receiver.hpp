@@ -21,9 +21,10 @@ public:
 		bool result = true;
 		for (int i = 0; i < count; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
-				m_recv_buffer.push(buffer[i]);
+				result = result && m_recv_buffer.push(buffer[i]);
 			} else {
-				result = result && m_recv_buffer.push(static_cast<T>(buffer[i] * Athernet::FLOAT_INT_SCALE));
+				result = result
+					&& m_recv_buffer.push(static_cast<T>(buffer[i] * Athernet::RECV_FLOAT_INT_SCALE));
 			}
 		}
 		assert(result);

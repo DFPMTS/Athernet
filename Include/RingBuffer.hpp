@@ -42,6 +42,28 @@ public:
 		, m_tail(0)
 
 	{
+
+		// * [msvc-only] "c" mode option for WRITE THROUGH
+		/*	Microsoft C/C++ version 7.0 introduces the "c" mode option for the fopen()
+			function. When an application opens a file and specifies the "c" mode, the
+			run-time library writes the contents of the file buffer to disk when the
+			application calls the fflush() or _flushall() function. The "c" mode option is a
+			Microsoft extension and is not part of the ANSI standard for fopen().
+			* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
+		*/
+		// if constexpr (Athernet::DUMP_RECEIVED) {
+		receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "wc");
+		if (!receive_fd) {
+			std::cerr << "Unable to open received.txt!\n";
+			assert(0);
+		}
+		// }
+	}
+	~RingBuffer()
+	{
+		// if constexpr (Athernet::DUMP_RECEIVED) {
+		fclose(receive_fd);
+		// }
 	}
 
 	bool push(const std::vector<T>& vec)
@@ -69,7 +91,6 @@ public:
 		if (size_value == capacity()) {
 			return false;
 		}
-
 		m_data[m_tail] = val;
 		increment(m_tail);
 
@@ -101,7 +122,7 @@ public:
 			if constexpr (std::is_floating_point<T>::value) {
 				dest[i] = m_data[m_head];
 			} else {
-				dest[i] = static_cast<float>(m_data[m_head]) / Athernet::FLOAT_INT_SCALE;
+				dest[i] = static_cast<float>(m_data[m_head]) / Athernet::SEND_FLOAT_INT_SCALE;
 			}
 
 			increment(m_head);
@@ -114,8 +135,20 @@ public:
 
 	int discard(int count)
 	{
+		if (!count)
+			return 0;
 		int size_value = m_size.load(std::memory_order_acquire);
 		int discard_count = size_value < count ? size_value : count;
+
+		// if constexpr (Athernet::DUMP_RECEIVED) {
+		// for (int i = 0; i < discard_count; ++i) {
+		// 	if constexpr (std::is_floating_point<T>::value)
+		// 		fprintf(receive_fd, "%f ", (*this)[i]);
+		// 	else
+		// 		fprintf(receive_fd, "%f ", ((double)(*this)[i]) / Athernet::RECV_FLOAT_INT_SCALE);
+		// }
+		// fflush(receive_fd);
+		// }
 
 		increment_by(m_head, discard_count);
 
@@ -134,12 +167,14 @@ public:
 
 	int capacity() const { return m_capacity; }
 
+	int show_head() const { return m_head; }
+
 private:
+	FILE* receive_fd = nullptr;
 	int m_capacity;
 	std::atomic<int> m_size;
 	int m_head;
 	int m_tail;
 	std::vector<T> m_data;
 };
-
 }
