@@ -13,11 +13,12 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -27,10 +28,6 @@
 
 using namespace std::chrono_literals;
 using namespace std::string_literals;
-
-std::mutex mutex;
-
-int total_filled;
 
 template <typename T> class PHY_layer : public juce::AudioIODeviceCallback {
 public:
@@ -47,7 +44,6 @@ public:
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
 		int samples_wrote = m_sender.pop_stream(outputChannelData[0], numSamples);
-		total_filled += samples_wrote;
 
 		for (int i = samples_wrote; i < numSamples; ++i) {
 			outputChannelData[0][i] = 0;
@@ -56,7 +52,7 @@ public:
 		m_receiver.push_stream(inputChannelData[0], numSamples);
 	}
 
-	virtual void audioDeviceStopped() override { lock.unlock(); }
+	virtual void audioDeviceStopped() override { }
 
 	void send_frame(const std::vector<int>& frame) { m_sender.push_frame(frame); }
 
@@ -64,26 +60,32 @@ public:
 
 	~PHY_layer() { }
 
-	// Athernet::RingBuffer<float> m_recv_buffer;
-
 private:
-private:
-	std::unique_lock<std::mutex> lock { mutex };
-
 	Athernet::Config& config;
-
-	// Single Producer, Single Consumer-safe
-	// boost::lockfree::spsc_queue<float> m_send_buffer;
-	// boost::lockfree::spsc_queue<float> m_recv_buffer;
-
-	// Athernet::RingBuffer<float> m_send_buffer;
-
 	Athernet::PHY_Receiver<T> m_receiver;
-
 	Athernet::PHY_Sender<T> m_sender;
-
-	int total_samples = 0;
 };
+
+template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_packets, int packet_length)
+{
+	auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
+
+	for (int i = 0; i < num_packets; ++i) {
+		std::vector<int> a = {};
+		for (int j = 0; j < packet_length; ++j) {
+			if (rand() % 2)
+				a.push_back(1);
+			else
+				a.push_back(0);
+		}
+
+		physical_layer->send_frame(a);
+		for (const auto& x : a)
+			fprintf(sent_fd, "%d\n", x);
+		fflush(sent_fd);
+	}
+	fclose(sent_fd);
+}
 
 void* Project1_main_loop(void*)
 {
@@ -97,7 +99,7 @@ void* Project1_main_loop(void*)
 	device_setup.sampleRate = 48'000;
 	device_setup.bufferSize = 256;
 
-	auto physical_layer = std::make_unique<PHY_layer<float>>();
+	auto physical_layer = std::make_unique<PHY_layer<int>>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -121,7 +123,8 @@ void* Project1_main_loop(void*)
 	}
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
-	// device_setup.outputDeviceName = "USB Audio Device";
+	device_setup.inputDeviceName = "USB Audio Device";
+	device_setup.outputDeviceName = "USB Audio Device";
 
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 
@@ -139,65 +142,39 @@ void* Project1_main_loop(void*)
 	srand(static_cast<unsigned int>(time(0)));
 
 	adm.addAudioCallback(physical_layer.get());
-	// std::this_thread::sleep_for(1s);
-	{
-		auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
 
-		for (int i = 0; i < 100; ++i) {
-			std::vector<int> a = {};
-			// for (int j = 1; j < 15; ++j) {
-			// 	for (int k = 0; k < j; ++k) {
-			// 		if (j % 2)
-			// 			a.push_back(1);
-			// 		else
-			// 			a.push_back(0);
-			// 	}
-			// }
-			for (int j = 0; j < 10; ++j) {
-				if (j % 2)
-					a.push_back(1);
-				else
-					a.push_back(0);
+	std::string s;
+	while (std::cin >> s) {
+		if (s == "s") {
+			std::cin.ignore();
+			std::cout << "Please type your message:\n";
+			std::string data_s;
+			std::getline(std::cin, data_s);
+			std::vector<int> a;
+			for (const auto& c : data_s) {
+				int x = c;
+				for (int i = 0; i < 8; ++i, x >>= 1) {
+					a.push_back(x & 1);
+				}
 			}
-
 			physical_layer->send_frame(a);
-			for (const auto& x : a)
-				fprintf(sent_fd, "%d\n", x);
-			fflush(sent_fd);
+		} else if (s == "r") {
+			int num, len;
+			std::cin >> num >> len;
+			random_test<int>(physical_layer.get(), num, len);
+		} else if (s == "exit") {
+			break;
 		}
-		fclose(sent_fd);
 	}
 
-	// physical_layer->send_nonsense(500);
-	std::this_thread::sleep_for(5s);
-
 	adm.removeAudioCallback(physical_layer.get());
-	// std::lock_guard<std::mutex> lock_guard { mutex };
 
-	// static float recv[2000000];
-
-	// auto size = physical_layer->m_recv_buffer.pop(recv, 2000000);
-
-	// std::cerr << "begin\n";
-
-	// std::cerr << "end\n";
-	// std::cerr << "Total filled: " << total_filled << "\n";
-	// std::this_thread::sleep_for(10s);
 	return NULL;
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
 	std::ios::sync_with_stdio(false);
-
-	// Athernet::PHY_Receiver<float> test;
-	// std::ifstream fin(NOTEBOOK_DIR + "received.txt");
-	// float x[1];
-	// while (fin >> x[0]) {
-	// 	test.push_stream(x, 1);
-	// }
-
-	// return 0;
 
 	auto message_manager = juce::MessageManager::getInstance();
 	message_manager->callFunctionOnMessageThread(Project1_main_loop, NULL);

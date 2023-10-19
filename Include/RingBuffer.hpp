@@ -2,6 +2,7 @@
 
 #include "Config.hpp"
 #include <atomic>
+#include <set>
 #include <vector>
 
 namespace Athernet {
@@ -19,7 +20,7 @@ private:
 
 	void increment_by(int& x, int offset)
 	{
-		if ((x += offset) == m_capacity) {
+		if ((x += offset) >= m_capacity) {
 			x -= m_capacity;
 		}
 	}
@@ -34,10 +35,12 @@ private:
 	}
 
 public:
+	std::mutex mutex;
 	RingBuffer()
 		: m_capacity(Athernet::Config::get_instance().get_physical_buffer_size())
 		, m_size(0)
 		, m_data(m_capacity)
+		, dump(m_capacity)
 		, m_head(0)
 		, m_tail(0)
 
@@ -51,19 +54,29 @@ public:
 			Microsoft extension and is not part of the ANSI standard for fopen().
 			* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
 		*/
-		// if constexpr (Athernet::DUMP_RECEIVED) {
-		receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "wc");
-		if (!receive_fd) {
-			std::cerr << "Unable to open received.txt!\n";
-			assert(0);
+		if constexpr (Athernet::DUMP_RECEIVED) {
+			receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "w");
+			if (!receive_fd) {
+				std::cerr << "Unable to open received.txt!\n";
+				assert(0);
+			}
 		}
-		// }
 	}
 	~RingBuffer()
 	{
-		// if constexpr (Athernet::DUMP_RECEIVED) {
-		fclose(receive_fd);
-		// }
+		if constexpr (Athernet::DUMP_RECEIVED) {
+			for (int i = 0; i < m_head; ++i) {
+				if constexpr (std::is_floating_point<T>::value) {
+					fprintf(receive_fd, "%f ", m_data[i]);
+				} else {
+					fprintf(receive_fd, "%f ", (double)m_data[i] / SEND_FLOAT_INT_SCALE);
+				}
+				if (i % 10000 == 0) {
+					fflush(receive_fd);
+				}
+			}
+			fclose(receive_fd);
+		}
 	}
 
 	bool push(const std::vector<T>& vec)
@@ -80,21 +93,21 @@ public:
 			increment(m_tail);
 		}
 
-		m_size.store(size_value + vec_size, std::memory_order_release);
+		m_size.fetch_add(vec_size);
 		return true;
 	}
 
 	bool push(const T& val)
 	{
-		int size_value = m_size.load(std::memory_order_relaxed);
-
+		int size_value = m_size.load();
 		if (size_value == capacity()) {
 			return false;
 		}
 		m_data[m_tail] = val;
 		increment(m_tail);
 
-		m_size.store(size_value + 1, std::memory_order_release);
+		m_size.fetch_add(1);
+
 		return true;
 	}
 
@@ -108,7 +121,7 @@ public:
 			increment(m_head);
 		}
 
-		m_size.store(size_value - popped_count, std::memory_order_relaxed);
+		m_size.fetch_sub(popped_count);
 
 		return popped_count;
 	}
@@ -128,32 +141,20 @@ public:
 			increment(m_head);
 		}
 
-		m_size.store(size_value - popped_count, std::memory_order_relaxed);
+		m_size.fetch_sub(popped_count);
 
 		return popped_count;
 	}
 
 	int discard(int count)
 	{
+		assert(count >= 0);
 		if (!count)
 			return 0;
-		int size_value = m_size.load(std::memory_order_acquire);
+		int size_value = m_size.load();
 		int discard_count = size_value < count ? size_value : count;
-
-		// if constexpr (Athernet::DUMP_RECEIVED) {
-		// for (int i = 0; i < discard_count; ++i) {
-		// 	if constexpr (std::is_floating_point<T>::value)
-		// 		fprintf(receive_fd, "%f ", (*this)[i]);
-		// 	else
-		// 		fprintf(receive_fd, "%f ", ((double)(*this)[i]) / Athernet::RECV_FLOAT_INT_SCALE);
-		// }
-		// fflush(receive_fd);
-		// }
-
 		increment_by(m_head, discard_count);
-
-		m_size.store(size_value - discard_count, std::memory_order_relaxed);
-
+		m_size.fetch_sub(discard_count);
 		return discard_count;
 	}
 
@@ -163,11 +164,13 @@ public:
 		return m_data[head_add_offset(x)];
 	}
 
-	int size() const { return m_size.load(std::memory_order_acquire); }
+	int size() { return m_size.load(); }
 
-	int capacity() const { return m_capacity; }
+	int capacity() { return m_capacity; }
 
-	int show_head() const { return m_head; }
+	int show_head() { return m_head; }
+
+	int show_tail() { return m_tail; }
 
 private:
 	FILE* receive_fd = nullptr;
@@ -176,5 +179,7 @@ private:
 	int m_head;
 	int m_tail;
 	std::vector<T> m_data;
+	std::vector<T> dump;
+	int dump_ptr = 0;
 };
 }

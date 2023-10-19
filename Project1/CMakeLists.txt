@@ -70,6 +70,7 @@ jucer_project_files("Project1/Include"
   .         .         .         "Include/PHY_Sender.hpp"
   .         .         .         "Include/PHY_Receiver.hpp"
   .         .         .         "Include/PHY_FrameExtractor.hpp"
+  .         .         .         "Include/SyncQueue.hpp"
 )
 
 # --------------------------------Source----------------------------------- #

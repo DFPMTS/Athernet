@@ -1,15 +1,21 @@
 #include "Config.hpp"
 #include "RingBuffer.hpp"
+#include "SyncQueue.hpp"
 #include <atomic>
 #include <thread>
 #include <vector>
 
 namespace Athernet {
 template <typename T> class FrameExtractor {
+	using SoftUInt64 = std::pair<uint32_t, uint32_t>;
+	using Bits = std::vector<int>;
+	using Frame = std::vector<int>;
+
 public:
-	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer)
+	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue)
 		: config { Athernet::Config::get_instance() }
 		, m_recv_buffer { recv_buffer }
+		, m_recv_queue { recv_queue }
 	{
 		running.store(true);
 		start = 0;
@@ -22,15 +28,13 @@ public:
 		std::cerr << "Called\n";
 		running.store(false);
 		worker.join();
-		std::cerr << m_recv_buffer.show_head() << "\n";
 		std::cerr << "End\n";
 	};
 
 private:
-	using SoftUInt64 = std::pair<uint32_t, uint32_t>;
-	using Bits = std::vector<int>;
-
 	double to_double(SoftUInt64 x) { return (double)((((unsigned long long)x.first) << 32) + x.second); }
+
+	int LEN = 0;
 
 	void frame_extract_loop()
 	{
@@ -41,26 +45,16 @@ private:
 		PhyRecvState next_state = PhyRecvState::INVALID_STATE;
 		Bits length;
 		Bits bits;
-		std::vector<int> collect;
 		int received = 0;
 		int good = 0;
-		int fail = 0;
 		while (running.load()) {
 			if (state == PhyRecvState::WAIT_HEADER) {
-				// std::cerr << " running.... \n";
-				// if (start > m_recv_buffer.size() - config.get_preamble_length()) {
-				// 	++wait;
-				// 	continue;
-				// }
+				if (start > m_recv_buffer.size() - config.get_preamble_length()) {
+					std::this_thread::yield();
+					continue;
+				}
 
-				// std::cerr << start << " " << m_recv_buffer.size() << " " << config.get_preamble_length()
-				// 		  << "\n";
-
-				// std::cerr << "Running  " << running.load() << "\n";
-				// std::cerr << "    head " << m_recv_buffer.show_head() << "\n";
-				// collect.push_back(m_recv_buffer.show_head());
 				bool confirmed = false;
-
 				for (int i = start, buffer_size = m_recv_buffer.size();
 					 i <= buffer_size - config.get_preamble_length(); ++i, ++start) {
 					T dot_product = 0;
@@ -74,29 +68,32 @@ private:
 
 					if (dot_product < 0)
 						continue;
-					// now we need to square dot_product, use two int32 to store result
 
+					// now we need to square dot_product, use two int32 to store result
 					auto dot_product_square = mul_large(dot_product, dot_product, Tag<T>());
 
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
-
-					if (fail) {
-						std::cerr << "Now head " << m_recv_buffer.show_head() << " " << m_recv_buffer.size()
-								  << "\n";
-						std::cerr << dot_product_square / preamble_received_energy_product << "\n";
-						fail--;
-					}
 
 					if (greater_than(mul_6(dot_product_square, Tag<T>()), preamble_received_energy_product,
 							Tag<T>())) {
 						if (dot_product > max_val) {
 							max_val = dot_product;
 							max_pos = i;
-							std::cerr << "Greater:  " << max_val << "\n";
-							std::cerr << dot_product_square / preamble_received_energy_product << "\n";
-							std::cerr << dot_product << " " << received_energy << " "
-									  << config.get_preamble_energy(Tag<T>()) << "\n";
+							// std::cerr << "Greater:  " << max_val << "\n";
+							// std::cerr << preamble_received_energy_product.first << " "
+							// 		  << preamble_received_energy_product.second << "\n";
+							// auto [h, l]
+							// 	= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
+							// std::cerr << config.get_preamble_energy(Tag<T>()) << " " << received_energy
+							// 		  << "\n";
+							// std::cerr << h << " " << l << "\n";
+							// std::cerr << "--------------------------------------------------------";
+
+							// std::cerr << to_double(dot_product_square) << " "
+							// 		  << to_double(preamble_received_energy_product) << "\n";
+							// std::cerr << dot_product << " " << received_energy << " "
+							// 		  << config.get_preamble_energy(Tag<T>()) << "\n";
 						}
 					}
 
@@ -105,21 +102,14 @@ private:
 						break;
 					}
 				}
-
 				if (confirmed) {
 					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
 					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
-					collect.push_back(0);
-					collect.push_back(0);
-					collect.push_back(m_recv_buffer.show_head());
-					collect.push_back(0);
-					collect.push_back(0);
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
 					max_val = 0;
-					fail = 0;
 					state = PhyRecvState::GET_LENGTH;
 				} else {
 					if (max_pos != -1) {
@@ -140,7 +130,7 @@ private:
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
 				static int counter = 0;
-				std::cerr << "Begin GetDATA" << (++counter) << "\n";
+				std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
@@ -153,41 +143,36 @@ private:
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit()) {
 					state = PhyRecvState::WAIT_HEADER;
-					fail = 10;
 					// restore start
 					start = saved_start;
 					// discard
-					std::cerr << "                 ";
+					std::cerr << "                                    ";
 					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
-				// collect data and crc residual
-
 				bits.clear();
+				// collect data and crc residual
 				symbols_to_collect = payload_length + config.get_crc_residual_length();
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::CHECK_PAYLOAD;
 			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
-
-				// ! Just show it
-				for (const auto& x : bits) {
-					std::cerr << x;
-				}
-				std::cerr << "\n";
-
 				if (crc_check(length, bits)) {
 					// good to go
 					for (int i = 0; i < config.get_crc_residual_length(); ++i) {
 						bits.pop_back();
 					}
 					good++;
-					std::cerr << "     Good:   " << good << "\n";
-
+					// std::cerr << "     Good:   " << good << "\n";
+					// // ! Just show it
+					// for (const auto& x : bits) {
+					// 	std::cerr << x;
+					// }
+					// std::cerr << "\n";
+					m_recv_queue.push(std::move(bits));
 				} else {
 					// discard
-					fail = 10;
-					std::cerr << "                 ";
+					std::cerr << "                                    ";
 					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
@@ -196,22 +181,23 @@ private:
 			} else if (state == PhyRecvState::COLLECT_BITS) {
 				if (!symbols_to_collect) {
 					state = next_state;
+				} else {
+					symbols_to_collect -= to_bits(symbols_to_collect, bits);
+					if (symbols_to_collect) {
+						std::this_thread::yield();
+					}
 				}
-				symbols_to_collect -= to_bits(symbols_to_collect, bits);
 			} else if (state == PhyRecvState::INVALID_STATE) {
 				std::cerr << "[PHY_FrameExtractor] Invalid state!\n";
 				assert(0);
 			}
 		}
-		for (int i = 0; i < collect.size(); ++i)
-			std::cerr << collect[i] << " ";
-		std::cerr << "\n";
 
-		// if constexpr (Athernet::DUMP_RECEIVED) {
-		std::cerr << "--------[FrameExtractor]--------\n";
-		std::cerr << "     Received:      " << received << "\n";
-		std::cerr << "     Bad:           " << received - good << "\n";
-		// }
+		if constexpr (Athernet::DUMP_RECEIVED) {
+			std::cerr << "--------[FrameExtractor]--------\n";
+			std::cerr << "     Received:      " << received << "\n";
+			std::cerr << "     Bad:           " << received - good << "\n";
+		}
 	}
 
 	bool crc_check(Bits length, Bits bits)
@@ -241,7 +227,6 @@ private:
 		bool is_zero = true;
 		for (int i = static_cast<int>(bits.size()) - config.get_crc_residual_length();
 			 i < static_cast<int>(bits.size()); ++i) {
-			std::cerr << bits[i];
 			if (bits[i]) {
 				is_zero = false;
 			}
@@ -251,7 +236,7 @@ private:
 
 	int to_bits(int count, Bits& bits)
 	{
-		int rightmost_pos = std::min(m_recv_buffer.size() - config.get_symbol_length(),
+		int rightmost_pos = std::min(m_recv_buffer.size() - config.get_symbol_length() + 1,
 			start + mul_small(config.get_symbol_length(), count));
 		int converted_count = 0;
 		for (int i = start; i < rightmost_pos;
@@ -286,7 +271,7 @@ private:
 		while (y) {
 			if (y & 1)
 				ret += x;
-			x <<= 1;
+			x += x;
 			y >>= 1;
 		}
 		return ret;
@@ -305,7 +290,7 @@ private:
 		while (y) {
 			if (y & 1)
 				ret += x;
-			x <<= 1;
+			x += x;
 			y >>= 1;
 		}
 		return ret;
@@ -404,6 +389,7 @@ private:
 
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_recv_buffer;
+	Athernet::SyncQueue<Frame>& m_recv_queue;
 	std::thread worker;
 	std::atomic_bool running;
 	int start;

@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-#define WIN
+// #define WIN
 
 using namespace std::string_literals;
 
@@ -26,7 +26,7 @@ constexpr int SEND_FLOAT_INT_SCALE = 1000;
 
 // * Scale from floating point [-1.0, 1.0] to int
 // * In practice, the range is within [-0.01, 0.01]
-constexpr int RECV_FLOAT_INT_SCALE = 100'0;
+constexpr int RECV_FLOAT_INT_SCALE = 100'000;
 
 // * If dump received
 constexpr int DUMP_RECEIVED = 1;
@@ -41,7 +41,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 2000;
+		bit_rate = 3000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -187,8 +187,8 @@ private:
 	std::vector<int> preamble_int;
 	int preamble_int_energy;
 
-	int phy_frame_payload_symbol_limit = 200;
-	int phy_frame_length_num_bits = 8;
+	int phy_frame_payload_symbol_limit = 1000;
+	int phy_frame_length_num_bits = 10;
 
 	int carrier_f;
 	std::vector<float> carrier_0;
@@ -199,7 +199,7 @@ private:
 	// ! REVERSED for simplicity
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
-	int physical_buffer_size = 200'0000;
+	int physical_buffer_size = 10'0000;
 };
 
 }
