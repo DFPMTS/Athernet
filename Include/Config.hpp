@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-// #define WIN
+#define WIN
 
 using namespace std::string_literals;
 
@@ -25,8 +25,7 @@ template <typename T> struct Tag { };
 constexpr int SEND_FLOAT_INT_SCALE = 1000;
 
 // * Scale from floating point [-1.0, 1.0] to int
-// * In practice, the range is within [-0.01, 0.01]
-constexpr int RECV_FLOAT_INT_SCALE = 100'000;
+constexpr int RECV_FLOAT_INT_SCALE = 1'000;
 
 // * If dump received
 constexpr int DUMP_RECEIVED = 1;
@@ -158,6 +157,8 @@ public:
 
 	int get_crc_residual_length() const { return static_cast<int>(crc.size()) - 1; }
 
+	int get_phy_coding_overhead() const { return phy_coding_overhead; }
+
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
 	const std::vector<int>& get_preamble(Tag<int>) const { return preamble_int; }
@@ -187,8 +188,11 @@ private:
 	std::vector<int> preamble_int;
 	int preamble_int_energy;
 
-	int phy_frame_payload_symbol_limit = 1000;
-	int phy_frame_length_num_bits = 10;
+	int phy_frame_payload_symbol_limit = 200;
+	int phy_frame_length_num_bits = 8;
+
+	// 7 for windows start position, 19 for window itself
+	int phy_coding_overhead = 7 + 19;
 
 	int carrier_f;
 	std::vector<float> carrier_0;

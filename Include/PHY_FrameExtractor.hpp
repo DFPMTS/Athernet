@@ -12,10 +12,12 @@ template <typename T> class FrameExtractor {
 	using Frame = std::vector<int>;
 
 public:
-	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue)
+	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue,
+		Athernet::SyncQueue<Frame>& decoder_queue)
 		: config { Athernet::Config::get_instance() }
 		, m_recv_buffer { recv_buffer }
 		, m_recv_queue { recv_queue }
+		, m_decoder_queue { decoder_queue }
 	{
 		running.store(true);
 		start = 0;
@@ -29,6 +31,7 @@ public:
 		running.store(false);
 		worker.join();
 		std::cerr << "End\n";
+		m_recv_buffer.dump("received.txt");
 	};
 
 private:
@@ -75,8 +78,8 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_6(dot_product_square, Tag<T>()), preamble_received_energy_product,
-							Tag<T>())) {
+					if (greater_than(mul_large_small(dot_product_square, 4, Tag<T>()),
+							preamble_received_energy_product, Tag<T>())) {
 						if (dot_product > max_val) {
 							max_val = dot_product;
 							max_pos = i;
@@ -105,7 +108,7 @@ private:
 				if (confirmed) {
 					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
-					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					// std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
@@ -130,7 +133,7 @@ private:
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
 				static int counter = 0;
-				std::cerr << "Begin Get Data" << (++counter) << "\n";
+				// std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
@@ -139,15 +142,15 @@ private:
 					if (length[i])
 						payload_length += (1 << i);
 				}
-				std::cerr << "Length: " << payload_length << "\n";
+				// std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
-				if (payload_length > config.get_phy_frame_payload_symbol_limit()) {
+				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 2) {
 					state = PhyRecvState::WAIT_HEADER;
 					// restore start
 					start = saved_start;
 					// discard
-					std::cerr << "                                    ";
-					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// std::cerr << "                                    ";
+					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
@@ -163,17 +166,20 @@ private:
 						bits.pop_back();
 					}
 					good++;
-					// std::cerr << "     Good:   " << good << "\n";
-					// // ! Just show it
-					// for (const auto& x : bits) {
-					// 	std::cerr << x;
-					// }
-					// std::cerr << "\n";
-					m_recv_queue.push(std::move(bits));
+					// dispatch normal frame to recv_queue, and coded frame to decoder_queue
+					if (!bits[bits.size() - 1]) {
+						bits.pop_back();
+						m_recv_queue.push(std::move(bits));
+
+					} else {
+						bits.pop_back();
+						m_decoder_queue.push(std::move(bits));
+					}
+
 				} else {
 					// discard
-					std::cerr << "                                    ";
-					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// std::cerr << "                                    ";
+					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 
@@ -370,13 +376,20 @@ private:
 
 	bool greater_than(T x, T y, Tag<float>) { return x > y; }
 
-	SoftUInt64 mul_6(SoftUInt64 x, Tag<int>)
+	SoftUInt64 mul_large_small(SoftUInt64 x, int y, Tag<int>)
 	{
-		return add_large(std::make_pair(x.first << 2, x.second << 2),
-			std::make_pair(x.first << 1, x.second << 1), Tag<int>());
+		SoftUInt64 ret = std::make_pair(0U, 0U);
+		while (y) {
+			if (y & 1)
+				ret = add_large(ret, x, Tag<int>());
+			y >>= 1;
+			x.first <<= 1;
+			x.second <<= 1;
+		}
+		return ret;
 	}
 
-	float mul_6(T x, Tag<float>) { return x * 6; }
+	float mul_large_small(T x, int y, Tag<float>) { return x * y; }
 
 	enum class PhyRecvState {
 		WAIT_HEADER,
@@ -390,6 +403,7 @@ private:
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_recv_buffer;
 	Athernet::SyncQueue<Frame>& m_recv_queue;
+	Athernet::SyncQueue<Frame>& m_decoder_queue;
 	std::thread worker;
 	std::atomic_bool running;
 	int start;

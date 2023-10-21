@@ -40,12 +40,15 @@ public:
 		: m_capacity(Athernet::Config::get_instance().get_physical_buffer_size())
 		, m_size(0)
 		, m_data(m_capacity)
-		, dump(m_capacity)
 		, m_head(0)
 		, m_tail(0)
 
 	{
+	}
+	~RingBuffer() { }
 
+	void dump(std::string file)
+	{
 		// * [msvc-only] "c" mode option for WRITE THROUGH
 		/*	Microsoft C/C++ version 7.0 introduces the "c" mode option for the fopen()
 			function. When an application opens a file and specifies the "c" mode, the
@@ -54,29 +57,22 @@ public:
 			Microsoft extension and is not part of the ANSI standard for fopen().
 			* ----https://jeffpar.github.io/kbarchive/kb/066/Q66052/
 		*/
-		if constexpr (Athernet::DUMP_RECEIVED) {
-			receive_fd = fopen((NOTEBOOK_DIR + "received.txt"s).c_str(), "w");
-			if (!receive_fd) {
-				std::cerr << "Unable to open received.txt!\n";
-				assert(0);
+		FILE* receive_fd = fopen((NOTEBOOK_DIR + file).c_str(), "wc");
+		if (!receive_fd) {
+			std::cerr << "Unable to open " << file << "!\n";
+			assert(0);
+		}
+		for (int i = 0; i < m_capacity; ++i) {
+			if constexpr (std::is_floating_point<T>::value) {
+				fprintf(receive_fd, "%f ", m_data[i]);
+			} else {
+				fprintf(receive_fd, "%f ", (double)m_data[i] / RECV_FLOAT_INT_SCALE);
+			}
+			if (i % 10000 == 0) {
+				fflush(receive_fd);
 			}
 		}
-	}
-	~RingBuffer()
-	{
-		if constexpr (Athernet::DUMP_RECEIVED) {
-			for (int i = 0; i < m_head; ++i) {
-				if constexpr (std::is_floating_point<T>::value) {
-					fprintf(receive_fd, "%f ", m_data[i]);
-				} else {
-					fprintf(receive_fd, "%f ", (double)m_data[i] / SEND_FLOAT_INT_SCALE);
-				}
-				if (i % 10000 == 0) {
-					fflush(receive_fd);
-				}
-			}
-			fclose(receive_fd);
-		}
+		fclose(receive_fd);
 	}
 
 	bool push(const std::vector<T>& vec)
@@ -173,13 +169,10 @@ public:
 	int show_tail() { return m_tail; }
 
 private:
-	FILE* receive_fd = nullptr;
 	int m_capacity;
 	std::atomic<int> m_size;
 	int m_head;
 	int m_tail;
 	std::vector<T> m_data;
-	std::vector<T> dump;
-	int dump_ptr = 0;
 };
 }
