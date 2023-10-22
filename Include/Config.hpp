@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-#define WIN
+// #define WIN
 
 using namespace std::string_literals;
 
@@ -33,6 +33,9 @@ constexpr int DUMP_RECEIVED = 1;
 // put preambles, ring buffer size ... etc inside.
 // Singleton
 class Config {
+	using Carriers = std::vector<std::vector<std::vector<float>>>;
+	using CarriersInt = std::vector<std::vector<std::vector<int>>>;
+
 public:
 	Config()
 	{
@@ -94,19 +97,27 @@ public:
 
 		// Carrier Wave
 		{
-			carrier_f = 6000;
-
 			int samples_per_bit = sample_rate / bit_rate;
+			std::vector<int> carrier_frequencies = { 6000, 9000, 12000 };
 
-			for (int i = 0; i < samples_per_bit; ++i) {
-				carrier_0.push_back(static_cast<float>(cos(2 * PI * carrier_f * i / sample_rate)));
-				carrier_1.push_back(static_cast<float>(-cos(2 * PI * carrier_f * i / sample_rate)));
+			for (auto carrier_f : carrier_frequencies) {
+				std::vector<float> carrier_0, carrier_1;
+				for (int i = 0; i < samples_per_bit; ++i) {
+					carrier_0.push_back(static_cast<float>(cos(2 * PI * carrier_f * i / sample_rate)));
+					carrier_1.push_back(static_cast<float>(-cos(2 * PI * carrier_f * i / sample_rate)));
+				}
+				carriers.push_back({ carrier_0, carrier_1 });
+
+				std::vector<int> carrier_0_int, carrier_1_int;
+				for (int i = 0; i < samples_per_bit; ++i) {
+					carrier_0_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_0[i]));
+					carrier_1_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_1[i]));
+				}
+				carriers_int.push_back({ carrier_0_int, carrier_1_int });
 			}
 
-			for (int i = 0; i < samples_per_bit; ++i) {
-				carrier_0_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_0[i]));
-				carrier_1_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_1[i]));
-			}
+			phy_frame_CP_length = samples_per_bit >> 2;
+			phy_frame_CP_length = 0;
 		}
 
 		{
@@ -117,12 +128,12 @@ public:
 
 		{
 			std::ofstream fout(NOTEBOOK_DIR + "carrier_0.txt"s);
-			for (auto x : carrier_0)
+			for (auto x : carriers[0][0])
 				fout << x << " ";
 		}
 		{
 			std::ofstream fout(NOTEBOOK_DIR + "carrier_1.txt"s);
-			for (auto x : carrier_1)
+			for (auto x : carriers[0][1])
 				fout << x << " ";
 		}
 		{
@@ -155,6 +166,7 @@ public:
 
 	int get_preamble_length() const { return preamble_length; }
 
+	int get_crc_length() const { return static_cast<int>(crc.size()); }
 	int get_crc_residual_length() const { return static_cast<int>(crc.size()) - 1; }
 
 	int get_phy_coding_overhead() const { return phy_coding_overhead; }
@@ -165,13 +177,14 @@ public:
 	float get_preamble_energy(Tag<float>) const { return preamble_energy; }
 	int get_preamble_energy(Tag<int>) const { return preamble_int_energy; }
 
-	const std::vector<float>& get_carrier_0(Tag<float>) const { return carrier_0; }
-	const std::vector<int>& get_carrier_0(Tag<int>) const { return carrier_0_int; }
+	const Carriers& get_carriers(Tag<float>) const { return carriers; }
+	const CarriersInt& get_carriers(Tag<int>) const { return carriers_int; }
 
-	const std::vector<float>& get_carrier_1(Tag<float>) const { return carrier_1; }
-	const std::vector<int>& get_carrier_1(Tag<int>) const { return carrier_1_int; }
+	int get_num_carriers() const { return carriers.size(); }
 
-	int get_symbol_length() const { return static_cast<int>(carrier_0.size()); }
+	int get_symbol_length() const { return static_cast<int>(carriers[0][0].size()); }
+
+	int get_phy_frame_CP_length() const { return phy_frame_CP_length; }
 
 	const std::vector<int>& get_crc() const { return crc; }
 
@@ -188,17 +201,16 @@ private:
 	std::vector<int> preamble_int;
 	int preamble_int_energy;
 
-	int phy_frame_payload_symbol_limit = 200;
+	int phy_frame_CP_length;
+
+	int phy_frame_payload_symbol_limit = 400;
 	int phy_frame_length_num_bits = 8;
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
 
-	int carrier_f;
-	std::vector<float> carrier_0;
-	std::vector<float> carrier_1;
-	std::vector<int> carrier_0_int;
-	std::vector<int> carrier_1_int;
+	std::vector<std::vector<std::vector<float>>> carriers;
+	std::vector<std::vector<std::vector<int>>> carriers_int;
 
 	// ! REVERSED for simplicity
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8

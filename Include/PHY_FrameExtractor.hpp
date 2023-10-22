@@ -160,7 +160,7 @@ private:
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::CHECK_PAYLOAD;
 			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
-				if (crc_check(length, bits)) {
+				if (crc_check(bits)) {
 					// good to go
 					for (int i = 0; i < config.get_crc_residual_length(); ++i) {
 						bits.pop_back();
@@ -206,25 +206,11 @@ private:
 		}
 	}
 
-	bool crc_check(Bits length, Bits bits)
+	bool crc_check(Bits bits)
 	{
-		for (int i = 0; i < config.get_crc_residual_length(); ++i) {
-			length.push_back(0);
-		}
-		for (int i = 0; i < length.size() - config.get_crc_residual_length(); ++i) {
-			if (length[i])
-				for (int j = 0; j < config.get_crc().size(); ++j) {
-					length[i + j] ^= config.get_crc()[j];
-				}
-		}
-
-		for (int i = 0; i < config.get_crc_residual_length(); ++i) {
-			bits[i] ^= length[length.size() - config.get_crc_residual_length() + i];
-		}
-
 		for (int i = 0; i < bits.size() - config.get_crc_residual_length(); ++i) {
 			if (bits[i]) {
-				for (int j = 0; j < config.get_crc().size(); ++j) {
+				for (int j = 0; j < config.get_crc_length(); ++j) {
 					bits[i + j] ^= config.get_crc()[j];
 				}
 			}
@@ -242,25 +228,29 @@ private:
 
 	int to_bits(int count, Bits& bits)
 	{
-		int rightmost_pos = std::min(m_recv_buffer.size() - config.get_symbol_length() + 1,
-			start + mul_small(config.get_symbol_length(), count));
+		int rightmost_pos
+			= m_recv_buffer.size() - config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
 		int converted_count = 0;
-		for (int i = start; i < rightmost_pos;
-			 i += config.get_symbol_length(), start += config.get_symbol_length()) {
 
-			T dot_product = 0;
-			for (int j = 0; j < config.get_symbol_length(); ++j) {
-				dot_product
-					+= mul_small(m_recv_buffer[i + j], config.get_carrier_0(Athernet::Tag<T>())[j], Tag<T>());
+		for (int i = start; i < rightmost_pos && converted_count < count;
+			 i += config.get_phy_frame_CP_length() + config.get_symbol_length(),
+				 start += config.get_phy_frame_CP_length() + config.get_symbol_length()) {
+			for (const auto& carrier : config.get_carriers(Tag<T>())) {
+				T dot_product = 0;
+				for (int j = 0; j < config.get_symbol_length(); ++j) {
+					dot_product += mul_small(
+						m_recv_buffer[i + config.get_phy_frame_CP_length() + j], carrier[0][j], Tag<T>());
+				}
+				if (dot_product > 0) {
+					bits.push_back(0);
+				} else {
+					bits.push_back(1);
+				}
+				if (++converted_count >= count)
+					break;
 			}
-			if (dot_product > 0) {
-				bits.push_back(0);
-			} else {
-				bits.push_back(1);
-			}
-
-			++converted_count;
 		}
+
 		return converted_count;
 	}
 

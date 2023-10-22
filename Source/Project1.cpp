@@ -19,7 +19,7 @@
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -29,6 +29,31 @@
 
 using namespace std::chrono_literals;
 using namespace std::string_literals;
+
+class SoundGenerator : public juce::AudioIODeviceCallback {
+public:
+	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override { }
+
+	virtual void audioDeviceIOCallbackWithContext([[maybe_unused]] const float* const* inputChannelData,
+		[[maybe_unused]] int numInputChannels, [[maybe_unused]] float* const* outputChannelData,
+		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
+		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
+	{
+		for (int i = 0; i < numSamples; ++i) {
+			outputChannelData[0][i] = sin(2 * PI * 1000 * (total_samples + i) / sample_rate)
+				+ sin(2 * PI * 10000 * (total_samples + i) / sample_rate);
+		}
+		total_samples += numSamples;
+		if (total_samples >= sample_rate)
+			total_samples -= sample_rate;
+	}
+
+	virtual void audioDeviceStopped() override { }
+
+private:
+	int total_samples = 0;
+	int sample_rate = 48000;
+};
 
 template <typename T> class PHY_layer : public juce::AudioIODeviceCallback {
 public:
@@ -89,6 +114,49 @@ template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_pac
 	fclose(sent_fd);
 }
 
+void* Project1_Task2_loop(void*)
+{
+	// Use RAII pattern to take care of initializing/shutting down JUCE
+	juce::ScopedJuceInitialiser_GUI init;
+
+	juce::AudioDeviceManager adm;
+	adm.initialiseWithDefaultDevices(0, 1);
+
+	auto device_setup = adm.getAudioDeviceSetup();
+	device_setup.sampleRate = 48000;
+	device_setup.bufferSize = 256;
+
+	auto sound_generator = std::make_unique<SoundGenerator>();
+
+	auto device_type = adm.getCurrentDeviceTypeObject();
+	{
+		auto default_input = device_type->getDefaultDeviceIndex(true);
+		auto input_devices = device_type->getDeviceNames(true);
+
+		std::cerr << "-------Input-------\n";
+		for (int i = 0; i < input_devices.size(); ++i)
+			std::cerr << (i == default_input ? "x " : "  ") << input_devices[i] << "\n";
+	}
+
+	{
+		auto default_output = device_type->getDefaultDeviceIndex(false);
+		auto output_devices = device_type->getDeviceNames(false);
+
+		std::cerr << "-------Output------\n";
+		for (int i = 0; i < output_devices.size(); ++i)
+			std::cerr << (i == default_output ? "x " : "  ") << output_devices[i] << "\n";
+		std::cerr << "-------------------\n";
+	}
+	device_setup.outputDeviceName = "MacBook Pro Speakers";
+	adm.setAudioDeviceSetup(device_setup, false);
+
+	adm.addAudioCallback(sound_generator.get());
+
+	getchar();
+
+	adm.removeAudioCallback(sound_generator.get());
+}
+
 void* Project1_main_loop(void*)
 {
 	// Use RAII pattern to take care of initializing/shutting down JUCE
@@ -125,8 +193,8 @@ void* Project1_main_loop(void*)
 	}
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
-	// device_setup.inputDeviceName = "USB Audio Device";
-	// device_setup.outputDeviceName = "USB Audio Device";
+	device_setup.inputDeviceName = "USB Audio Device";
+	device_setup.outputDeviceName = "USB Audio Device";
 
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 
@@ -276,6 +344,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	// return 0;
 	auto message_manager = juce::MessageManager::getInstance();
 	message_manager->callFunctionOnMessageThread(Project1_main_loop, NULL);
+	// message_manager->callFunctionOnMessageThread(Project1_Task2_loop, NULL);
 
 	// should not be called manually -- juce::ScopedJuceInitialiser_GUI will do
 	// juce::DeletedAtShutdown::deleteAll();
