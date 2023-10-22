@@ -62,7 +62,7 @@ public:
 			std::cerr << "Unable to open " << file << "!\n";
 			assert(0);
 		}
-		for (int i = 0; i < m_capacity; ++i) {
+		for (int i = 0; i < m_head; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
 				fprintf(receive_fd, "%f ", m_data[i]);
 			} else {

@@ -78,7 +78,7 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_large_small(dot_product_square, 4, Tag<T>()),
+					if (greater_than(mul_large_small(dot_product_square, 10, Tag<T>()),
 							preamble_received_energy_product, Tag<T>())) {
 						if (dot_product > max_val) {
 							max_val = dot_product;
@@ -108,7 +108,7 @@ private:
 				if (confirmed) {
 					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
-					// std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
@@ -133,7 +133,7 @@ private:
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
 				static int counter = 0;
-				// std::cerr << "Begin Get Data" << (++counter) << "\n";
+				std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
@@ -142,15 +142,15 @@ private:
 					if (length[i])
 						payload_length += (1 << i);
 				}
-				// std::cerr << "Length: " << payload_length << "\n";
+				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 2) {
 					state = PhyRecvState::WAIT_HEADER;
 					// restore start
 					start = saved_start;
 					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					std::cerr << "                                    ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
@@ -178,8 +178,8 @@ private:
 
 				} else {
 					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					std::cerr << "                                    ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 
@@ -229,24 +229,33 @@ private:
 	int to_bits(int count, Bits& bits)
 	{
 		int rightmost_pos
-			= m_recv_buffer.size() - config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
+			= m_recv_buffer.size() - config.get_silence_length() - config.get_symbol_length() + 1;
 		int converted_count = 0;
 
 		for (int i = start; i < rightmost_pos && converted_count < count;
-			 i += config.get_phy_frame_CP_length() + config.get_symbol_length(),
-				 start += config.get_phy_frame_CP_length() + config.get_symbol_length()) {
+			 i += config.get_silence_length() + config.get_symbol_length(),
+				 start += config.get_silence_length() + config.get_symbol_length()) {
 			for (const auto& carrier : config.get_carriers(Tag<T>())) {
-				T dot_product = 0;
-				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					dot_product += mul_small(
-						m_recv_buffer[i + config.get_phy_frame_CP_length() + j], carrier[0][j], Tag<T>());
+				T max_val_0 = 0;
+				T max_val_1 = 0;
+				for (int offset = config.get_silence_length() - config.get_silence_length() / 2;
+					 offset < config.get_silence_length() + config.get_silence_length() / 2; ++offset) {
+					T dot_product_0 = 0;
+					T dot_product_1 = 0;
+					for (int j = 0; j < config.get_symbol_length(); ++j) {
+						dot_product_0 += mul_small(m_recv_buffer[i + offset + j], carrier[0][j], Tag<T>());
+						dot_product_1 += mul_small(m_recv_buffer[i + offset + j], carrier[1][j], Tag<T>());
+					}
+					max_val_0 = std::max(max_val_0, dot_product_0);
+					max_val_1 = std::max(max_val_1, dot_product_1);
 				}
-				if (dot_product > 0) {
+				if (max_val_0 > max_val_1) {
 					bits.push_back(0);
 				} else {
 					bits.push_back(1);
 				}
-				if (++converted_count >= count)
+				++converted_count;
+				if (converted_count >= count)
 					break;
 			}
 		}

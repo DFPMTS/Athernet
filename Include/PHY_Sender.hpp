@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Chirps.hpp"
 #include "Config.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
@@ -40,9 +41,10 @@ public:
 					continue;
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
-				// frame date is zero-padded to a fixed length
+
 				signal.clear();
 				append_preamble(signal);
+				append_silence(config.get_silence_length(), signal);
 
 				assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
 				Frame length;
@@ -53,19 +55,20 @@ public:
 						length.push_back(0);
 					}
 				}
+
 				modulate_vec(length, signal);
 
 				append_crc8(frame);
 				modulate_vec(frame, signal);
 
-				append_silence(signal);
-				append_silence(signal);
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {
 				if (!m_send_buffer.push(signal)) {
 					std::this_thread::yield();
 					continue;
 				} else {
+					static int num = 0;
+					std::cerr << "SEND  " << ++num << "\n";
 					state = PhySendState::PROCESS_FRAME;
 				}
 			} else if (state == PhySendState::INVALID_STATE) {
@@ -86,7 +89,7 @@ private:
 	void modulate_vec(const Frame& frame, Signal& signal)
 	{
 		for (int i = 0; i < frame.size(); i += config.get_num_carriers()) {
-			Signal this_piece(config.get_phy_frame_CP_length() + config.get_symbol_length());
+			Signal this_piece(config.get_symbol_length());
 			for (int j = 0; j < config.get_num_carriers(); ++j) {
 				if ((i + j < frame.size()) ? frame[i + j] : 0) {
 					add_carrier(j, 1, this_piece);
@@ -94,23 +97,15 @@ private:
 					add_carrier(j, 0, this_piece);
 				}
 			}
-			add_CP(this_piece);
 			append_vec(this_piece, signal);
+			append_silence(config.get_silence_length(), signal);
 		}
 	}
 
 	void add_carrier(int carrier_id, int carrier_type, Signal& signal)
 	{
 		for (int i = 0; i < config.get_symbol_length(); ++i) {
-			signal[config.get_phy_frame_CP_length() + i]
-				+= config.get_carriers(Tag<T>())[carrier_id][carrier_type][i];
-		}
-	}
-
-	void add_CP(Signal& signal)
-	{
-		for (int i = 0; i < config.get_phy_frame_CP_length(); ++i) {
-			signal[i] = signal[config.get_symbol_length() + i];
+			signal[i] += config.get_carriers(Tag<T>())[carrier_id][carrier_type][i];
 		}
 	}
 
@@ -132,7 +127,12 @@ private:
 		frame = std::move(saved_frame);
 	}
 
-	void append_silence(Signal& signal) { append_vec(m_silence, signal); }
+	void append_silence(int count, Signal& signal)
+	{
+		for (int i = 0; i < count; ++i) {
+			signal.push_back(0);
+		}
+	}
 
 	void append_vec(const Signal& from, Signal& to)
 	{
@@ -147,6 +147,5 @@ private:
 	std::atomic_bool running;
 	Athernet::RingBuffer<T> m_send_buffer;
 	Athernet::Config& config;
-	Signal m_silence = Signal(200);
 };
 }

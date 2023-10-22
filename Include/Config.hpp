@@ -1,10 +1,13 @@
 #pragma once
 
+#include "Chirps.hpp"
 #include <cassert>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <vector>
+
+#define PI acos(-1)
 
 #define WIN
 
@@ -39,9 +42,6 @@ class Config {
 public:
 	Config()
 	{
-		// PI
-		auto PI = acos(-1);
-
 		// * Bit Rate
 		bit_rate = 2000;
 
@@ -51,8 +51,8 @@ public:
 		{
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 6'000;
-			preamble_f2 = 12'000;
-			preamble_length = 200;
+			preamble_f2 = 22'000;
+			preamble_length = 400;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -84,39 +84,18 @@ public:
 			for (const auto& x : preamble) {
 				preamble_energy += x * x;
 			}
-
-			for (const auto& x : preamble) {
-				preamble_int.push_back(static_cast<int>(x * SEND_FLOAT_INT_SCALE));
-			}
-
-			preamble_int_energy = 0;
-			for (const auto& x : preamble_int) {
-				preamble_int_energy += x * x;
-			}
 		}
 
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			std::vector<int> carrier_frequencies = { 6000, 10000 };
-
-			for (auto carrier_f : carrier_frequencies) {
-				std::vector<float> carrier_0, carrier_1;
-				for (int i = 0; i < samples_per_bit; ++i) {
-					carrier_0.push_back(static_cast<float>(cos(2 * PI * carrier_f * i / sample_rate)));
-					carrier_1.push_back(static_cast<float>(-cos(2 * PI * carrier_f * i / sample_rate)));
-				}
-				carriers.push_back({ carrier_0, carrier_1 });
-
-				std::vector<int> carrier_0_int, carrier_1_int;
-				for (int i = 0; i < samples_per_bit; ++i) {
-					carrier_0_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_0[i]));
-					carrier_1_int.push_back(static_cast<int>(SEND_FLOAT_INT_SCALE * carrier_1[i]));
-				}
-				carriers_int.push_back({ carrier_0_int, carrier_1_int });
+			int min_f = 6000, max_f = 8000;
+			int band_width = 1000;
+			for (int start_f = min_f, end_f = min_f + band_width; end_f <= max_f;
+				 start_f += band_width, end_f += band_width) {
+				carriers.push_back(
+					{ chirp(start_f, (start_f + end_f) / 2, 400), chirp((start_f + end_f) / 2, end_f, 400) });
 			}
-
-			phy_frame_CP_length = samples_per_bit >> 2;
 		}
 
 		{
@@ -172,18 +151,16 @@ public:
 
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
-	const std::vector<int>& get_preamble(Tag<int>) const { return preamble_int; }
+
 	float get_preamble_energy(Tag<float>) const { return preamble_energy; }
-	int get_preamble_energy(Tag<int>) const { return preamble_int_energy; }
 
 	const Carriers& get_carriers(Tag<float>) const { return carriers; }
-	const CarriersInt& get_carriers(Tag<int>) const { return carriers_int; }
 
-	int get_num_carriers() const { return carriers.size(); }
+	int get_num_carriers() const { return static_cast<int>(carriers.size()); }
 
 	int get_symbol_length() const { return static_cast<int>(carriers[0][0].size()); }
 
-	int get_phy_frame_CP_length() const { return phy_frame_CP_length; }
+	int get_silence_length() const { return silence_length; }
 
 	const std::vector<int>& get_crc() const { return crc; }
 
@@ -197,10 +174,6 @@ private:
 	int preamble_f2;
 	std::vector<float> preamble;
 	float preamble_energy;
-	std::vector<int> preamble_int;
-	int preamble_int_energy;
-
-	int phy_frame_CP_length;
 
 	int phy_frame_payload_symbol_limit = 400;
 	int phy_frame_length_num_bits = 8;
@@ -208,13 +181,14 @@ private:
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
 
+	int silence_length = 100;
+
 	std::vector<std::vector<std::vector<float>>> carriers;
-	std::vector<std::vector<std::vector<int>>> carriers_int;
 
 	// ! REVERSED for simplicity
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
-	int physical_buffer_size = 10'0000;
+	int physical_buffer_size = 200'0000;
 };
 
 }

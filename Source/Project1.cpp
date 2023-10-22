@@ -30,31 +30,6 @@
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 
-class SoundGenerator : public juce::AudioIODeviceCallback {
-public:
-	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override { }
-
-	virtual void audioDeviceIOCallbackWithContext([[maybe_unused]] const float* const* inputChannelData,
-		[[maybe_unused]] int numInputChannels, [[maybe_unused]] float* const* outputChannelData,
-		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
-		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
-	{
-		for (int i = 0; i < numSamples; ++i) {
-			outputChannelData[0][i] = sin(2 * PI * 1000 * (total_samples + i) / sample_rate)
-				+ sin(2 * PI * 10000 * (total_samples + i) / sample_rate);
-		}
-		total_samples += numSamples;
-		if (total_samples >= sample_rate)
-			total_samples -= sample_rate;
-	}
-
-	virtual void audioDeviceStopped() override { }
-
-private:
-	int total_samples = 0;
-	int sample_rate = 48000;
-};
-
 template <typename T> class PHY_layer : public juce::AudioIODeviceCallback {
 public:
 	PHY_layer()
@@ -114,51 +89,6 @@ template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_pac
 	fclose(sent_fd);
 }
 
-void* Project1_Task2_loop(void*)
-{
-	// Use RAII pattern to take care of initializing/shutting down JUCE
-	juce::ScopedJuceInitialiser_GUI init;
-
-	juce::AudioDeviceManager adm;
-	adm.initialiseWithDefaultDevices(0, 1);
-
-	auto device_setup = adm.getAudioDeviceSetup();
-	device_setup.sampleRate = 48000;
-	device_setup.bufferSize = 256;
-
-	auto sound_generator = std::make_unique<SoundGenerator>();
-
-	auto device_type = adm.getCurrentDeviceTypeObject();
-	{
-		auto default_input = device_type->getDefaultDeviceIndex(true);
-		auto input_devices = device_type->getDeviceNames(true);
-
-		std::cerr << "-------Input-------\n";
-		for (int i = 0; i < input_devices.size(); ++i)
-			std::cerr << (i == default_input ? "x " : "  ") << input_devices[i] << "\n";
-	}
-
-	{
-		auto default_output = device_type->getDefaultDeviceIndex(false);
-		auto output_devices = device_type->getDeviceNames(false);
-
-		std::cerr << "-------Output------\n";
-		for (int i = 0; i < output_devices.size(); ++i)
-			std::cerr << (i == default_output ? "x " : "  ") << output_devices[i] << "\n";
-		std::cerr << "-------------------\n";
-	}
-	// device_setup.outputDeviceName = "MacBook Pro Speakers";
-	adm.setAudioDeviceSetup(device_setup, false);
-
-	adm.addAudioCallback(sound_generator.get());
-
-	getchar();
-
-	adm.removeAudioCallback(sound_generator.get());
-
-	return NULL;
-}
-
 void* Project1_main_loop(void*)
 {
 	// Use RAII pattern to take care of initializing/shutting down JUCE
@@ -171,7 +101,7 @@ void* Project1_main_loop(void*)
 	device_setup.sampleRate = 48'000;
 	device_setup.bufferSize = 256;
 
-	auto physical_layer = std::make_unique<PHY_layer<int>>();
+	auto physical_layer = std::make_unique<PHY_layer<float>>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -196,10 +126,7 @@ void* Project1_main_loop(void*)
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
 	// device_setup.inputDeviceName = "USB Audio Device";
-	// device_setup.outputDeviceName = "USB Audio Device";
-
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
-
 	// device_setup.outputDeviceName = "USB Audio Device";
 
 	adm.setAudioDeviceSetup(device_setup, false);
@@ -212,117 +139,121 @@ void* Project1_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer.get());
 
-	std::string s;
-	while (true) {
-		std::cin >> s;
-		static int group_flag = 0;
-		group_flag ^= 1;
-		if (s == "r") {
-			int num, len;
-			std::cin >> num >> len;
-			random_test(physical_layer.get(), num, len);
-		} else if (s == "s") {
-			std::string file;
-			std::vector<int> text;
-			int c;
+	random_test(physical_layer.get(), 10, 10);
 
-			std::cin >> file;
-			file = NOTEBOOK_DIR + file;
-			auto fd = fopen(file.c_str(), "r");
-			while ((c = fgetc(fd)) != EOF) {
-				text.push_back(int(c - '0'));
-			}
-			if (fd)
-				fclose(fd);
+	std::this_thread::sleep_for(5s);
 
-			int file_len = (int)text.size();
-			std::vector<int> length;
-			for (int i = 0; i < 16; ++i) {
-				if (file_len & (1 << i)) {
-					length.push_back(1);
-				} else {
-					length.push_back(0);
-				}
-			}
+	// std::string s;
+	// while (true) {
+	// 	std::cin >> s;
+	// 	static int group_flag = 0;
+	// 	group_flag ^= 1;
+	// 	if (s == "r") {
+	// 		int num, len;
+	// 		std::cin >> num >> len;
+	// 		random_test(physical_layer.get(), num, len);
+	// 	} else if (s == "s") {
+	// 		std::string file;
+	// 		std::vector<int> text;
+	// 		int c;
 
-			int num_packets = 100;
-			int packet_len = (int)(text.size() + length.size() - 1) / num_packets + 1;
+	// 		std::cin >> file;
+	// 		file = NOTEBOOK_DIR + file;
+	// 		auto fd = fopen(file.c_str(), "r");
+	// 		while ((c = fgetc(fd)) != EOF) {
+	// 			text.push_back(int(c - '0'));
+	// 		}
+	// 		if (fd)
+	// 			fclose(fd);
 
-			std::random_device seeder;
-			const auto seed = seeder.entropy() ? seeder() : time(nullptr);
-			std::mt19937 engine { static_cast<std::mt19937::result_type>(seed) };
-			std::uniform_int_distribution<int> window_start_distribution { 0, num_packets - 1 };
-			std::uniform_int_distribution<int> is_one_distribution { 1, 100 };
+	// 		int file_len = (int)text.size();
+	// 		std::vector<int> length;
+	// 		for (int i = 0; i < 16; ++i) {
+	// 			if (file_len & (1 << i)) {
+	// 				length.push_back(1);
+	// 			} else {
+	// 				length.push_back(0);
+	// 			}
+	// 		}
 
-			std::vector<std::vector<int>> mat;
-			std::vector<int> a;
+	// 		int num_packets = 100;
+	// 		int packet_len = (int)(text.size() + length.size() - 1) / num_packets + 1;
 
-			for (auto x : length) {
-				a.push_back(x);
-				if (a.size() == packet_len) {
-					mat.push_back(std::move(a));
-					a.clear();
-				}
-			}
-			for (auto x : text) {
-				a.push_back(x);
-				if (a.size() == packet_len) {
-					mat.push_back(std::move(a));
-					a.clear();
-				}
-			}
+	// 		std::random_device seeder;
+	// 		const auto seed = seeder.entropy() ? seeder() : time(nullptr);
+	// 		std::mt19937 engine { static_cast<std::mt19937::result_type>(seed) };
+	// 		std::uniform_int_distribution<int> window_start_distribution { 0, num_packets - 1 };
+	// 		std::uniform_int_distribution<int> is_one_distribution { 1, 100 };
 
-			if (a.size()) {
-				for (int i = (int)a.size(); i < packet_len; ++i) {
-					a.push_back(0);
-				}
-				mat.push_back(std::move(a));
-			}
+	// 		std::vector<std::vector<int>> mat;
+	// 		std::vector<int> a;
 
-			double packet_fail_rate = 0.6;
-			int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
+	// 		for (auto x : length) {
+	// 			a.push_back(x);
+	// 			if (a.size() == packet_len) {
+	// 				mat.push_back(std::move(a));
+	// 				a.clear();
+	// 			}
+	// 		}
+	// 		for (auto x : text) {
+	// 			a.push_back(x);
+	// 			if (a.size() == packet_len) {
+	// 				mat.push_back(std::move(a));
+	// 				a.clear();
+	// 			}
+	// 		}
 
-			while (packets_to_send--) {
-				std::vector<int> start;
-				int start_point = window_start_distribution(engine);
-				for (int i = 0; i < 7; ++i) {
-					if (start_point & (1 << i)) {
-						start.push_back(1);
-					} else {
-						start.push_back(0);
-					}
-				}
-				std::vector<int> bit_map(19);
-				std::vector<int> frame = mat[start_point];
-				for (int i = 0; i < 19; ++i) {
-					bit_map[i] = (is_one_distribution(engine) < 60) ? 1 : 0;
-					if (bit_map[i]) {
-						int j = start_point + i + 1;
-						if (j >= 100)
-							j -= 100;
-						for (int k = 0; k < packet_len; ++k) {
-							frame[k] ^= mat[j][k];
-						}
-					}
-				}
-				std::vector<int> actual_frame;
-				for (auto x : start)
-					actual_frame.push_back(x);
-				for (auto x : bit_map)
-					actual_frame.push_back(x);
-				for (auto x : frame)
-					actual_frame.push_back(x);
+	// 		if (a.size()) {
+	// 			for (int i = (int)a.size(); i < packet_len; ++i) {
+	// 				a.push_back(0);
+	// 			}
+	// 			mat.push_back(std::move(a));
+	// 		}
 
-				actual_frame.push_back(group_flag);
-				actual_frame.push_back(1);
+	// 		double packet_fail_rate = 0.6;
+	// 		int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
 
-				physical_layer->send_frame(actual_frame);
-			}
+	// 		while (packets_to_send--) {
+	// 			std::vector<int> start;
+	// 			int start_point = window_start_distribution(engine);
+	// 			for (int i = 0; i < 7; ++i) {
+	// 				if (start_point & (1 << i)) {
+	// 					start.push_back(1);
+	// 				} else {
+	// 					start.push_back(0);
+	// 				}
+	// 			}
+	// 			std::vector<int> bit_map(19);
+	// 			std::vector<int> frame = mat[start_point];
+	// 			for (int i = 0; i < 19; ++i) {
+	// 				bit_map[i] = (is_one_distribution(engine) < 60) ? 1 : 0;
+	// 				if (bit_map[i]) {
+	// 					int j = start_point + i + 1;
+	// 					if (j >= 100)
+	// 						j -= 100;
+	// 					for (int k = 0; k < packet_len; ++k) {
+	// 						frame[k] ^= mat[j][k];
+	// 					}
+	// 				}
+	// 			}
+	// 			std::vector<int> actual_frame;
+	// 			for (auto x : start)
+	// 				actual_frame.push_back(x);
+	// 			for (auto x : bit_map)
+	// 				actual_frame.push_back(x);
+	// 			for (auto x : frame)
+	// 				actual_frame.push_back(x);
 
-		} else if (s == "e") {
-			break;
-		}
-	}
+	// 			actual_frame.push_back(group_flag);
+	// 			actual_frame.push_back(1);
+
+	// 			physical_layer->send_frame(actual_frame);
+	// 		}
+
+	// 	} else if (s == "e") {
+	// 		break;
+	// 	}
+	// }
 
 	adm.removeAudioCallback(physical_layer.get());
 
