@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-// #define WIN
+#define WIN
 
 using namespace std::string_literals;
 
@@ -43,7 +43,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 3000;
+		bit_rate = 2000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -98,7 +98,7 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			std::vector<int> carrier_frequencies = { 6000, 9000, 12000 };
+			std::vector<int> carrier_frequencies = { 6000, 10000 };
 
 			for (auto carrier_f : carrier_frequencies) {
 				std::vector<float> carrier_0, carrier_1;
@@ -117,7 +117,6 @@ public:
 			}
 
 			phy_frame_CP_length = samples_per_bit >> 2;
-			phy_frame_CP_length = 0;
 		}
 
 		{

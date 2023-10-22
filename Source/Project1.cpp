@@ -19,7 +19,7 @@
 
 #define PI acos(-1)
 
-// #define WIN
+#define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -147,7 +147,7 @@ void* Project1_Task2_loop(void*)
 			std::cerr << (i == default_output ? "x " : "  ") << output_devices[i] << "\n";
 		std::cerr << "-------------------\n";
 	}
-	device_setup.outputDeviceName = "MacBook Pro Speakers";
+	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 	adm.setAudioDeviceSetup(device_setup, false);
 
 	adm.addAudioCallback(sound_generator.get());
@@ -155,6 +155,8 @@ void* Project1_Task2_loop(void*)
 	getchar();
 
 	adm.removeAudioCallback(sound_generator.get());
+
+	return NULL;
 }
 
 void* Project1_main_loop(void*)
@@ -193,8 +195,8 @@ void* Project1_main_loop(void*)
 	}
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
-	device_setup.inputDeviceName = "USB Audio Device";
-	device_setup.outputDeviceName = "USB Audio Device";
+	// device_setup.inputDeviceName = "USB Audio Device";
+	// device_setup.outputDeviceName = "USB Audio Device";
 
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 
@@ -278,7 +280,7 @@ void* Project1_main_loop(void*)
 			}
 
 			double packet_fail_rate = 0.6;
-			int packets_to_send = static_cast<int>((num_packets + 35) / packet_fail_rate);
+			int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
 
 			while (packets_to_send--) {
 				std::vector<int> start;
