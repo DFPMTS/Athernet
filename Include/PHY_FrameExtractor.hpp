@@ -39,6 +39,18 @@ private:
 
 	int LEN = 0;
 
+	T pow(T a, int b)
+	{
+		T ret = 1;
+		while (b) {
+			if (b & 1)
+				ret *= a;
+			a *= a;
+			b >>= 1;
+		}
+		return ret;
+	}
+
 	void frame_extract_loop()
 	{
 		T max_val = 0;
@@ -50,6 +62,10 @@ private:
 		Bits bits;
 		int received = 0;
 		int good = 0;
+		T normed_corr = 0;
+		std::queue<T> norm_window;
+		T window_sum;
+		int window_size = 50;
 		while (running.load()) {
 			if (state == PhyRecvState::WAIT_HEADER) {
 				if (start > m_recv_buffer.size() - config.get_preamble_length()) {
@@ -78,10 +94,18 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_large_small(dot_product_square, 10, Tag<T>()),
-							preamble_received_energy_product, Tag<T>())) {
-						if (dot_product > max_val) {
-							max_val = dot_product;
+					auto corr = dot_product_square / preamble_received_energy_product;
+					norm_window.push(corr);
+					window_sum += corr;
+					if (norm_window.size() > window_size) {
+						window_sum -= norm_window.front();
+						norm_window.pop();
+					}
+					normed_corr = pow((2 * (corr / window_sum)), 5);
+
+					if (corr > 0.05) {
+						if (corr > max_val) {
+							max_val = corr;
 							max_pos = i;
 							// std::cerr << "Greater:  " << max_val << "\n";
 							// std::cerr << preamble_received_energy_product.first << " "
@@ -238,8 +262,10 @@ private:
 			for (const auto& carrier : config.get_carriers(Tag<T>())) {
 				T max_val_0 = 0;
 				T max_val_1 = 0;
-				for (int offset = config.get_silence_length() - config.get_silence_length() / 2;
-					 offset < config.get_silence_length() + config.get_silence_length() / 2; ++offset) {
+				T sum_of_square_0 = 0;
+				T sum_of_square_1 = 0;
+				for (int offset = config.get_silence_length() - config.get_silence_length() / 3;
+					 offset < config.get_silence_length() + config.get_silence_length() / 3; ++offset) {
 					T dot_product_0 = 0;
 					T dot_product_1 = 0;
 					for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -248,8 +274,10 @@ private:
 					}
 					max_val_0 = std::max(max_val_0, dot_product_0);
 					max_val_1 = std::max(max_val_1, dot_product_1);
+					sum_of_square_0 += dot_product_0 * dot_product_0;
+					sum_of_square_1 += dot_product_1 * dot_product_1;
 				}
-				if (max_val_0 > max_val_1) {
+				if (sum_of_square_0 > sum_of_square_1) {
 					bits.push_back(0);
 				} else {
 					bits.push_back(1);

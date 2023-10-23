@@ -9,7 +9,7 @@
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 using namespace std::string_literals;
 
@@ -52,7 +52,7 @@ public:
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 6'000;
 			preamble_f2 = 22'000;
-			preamble_length = 400;
+			preamble_length = 800;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -89,8 +89,8 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			int min_f = 6000, max_f = 8000;
-			int band_width = 1000;
+			int min_f = 6000, max_f = 22000;
+			int band_width = 800;
 			for (int start_f = min_f, end_f = min_f + band_width; end_f <= max_f;
 				 start_f += band_width, end_f += band_width) {
 				carriers.push_back(

@@ -61,6 +61,8 @@ public:
 				append_crc8(frame);
 				modulate_vec(frame, signal);
 
+				append_silence(200, signal);
+
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {
 				if (!m_send_buffer.push(signal)) {

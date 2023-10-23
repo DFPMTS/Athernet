@@ -19,7 +19,7 @@
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -124,7 +124,7 @@ void* Project1_main_loop(void*)
 		std::cerr << "-------------------\n";
 	}
 
-	// device_setup.inputDeviceName = "MacBook Pro Microphone";
+	device_setup.inputDeviceName = "MacBook Pro Microphone";
 	// device_setup.inputDeviceName = "USB Audio Device";
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 	// device_setup.outputDeviceName = "USB Audio Device";
@@ -139,9 +139,9 @@ void* Project1_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer.get());
 
-	random_test(physical_layer.get(), 10, 10);
+	random_test(physical_layer.get(), 100, 100);
 
-	std::this_thread::sleep_for(5s);
+	std::this_thread::sleep_for(10s);
 
 	// std::string s;
 	// while (true) {
