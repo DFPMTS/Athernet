@@ -10,11 +10,9 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   # ---- FRUT
   #   |- JUCE
   #   |- asiosdk_2.3.3_2019-06-14
-  #   |- boost_1_82_0
   #   |- [This Project]
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../FRUT/prefix/FRUT/cmake")
   set(JUCE_MODULES_GLOBAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../../JUCE/modules")
-  set(BOOST_PATH "${CMAKE_CURRENT_LIST_DIR}/../../boost_1_82_0/")
   set(ASIO_PATH "${CMAKE_CURRENT_LIST_DIR}/../../asiosdk_2.3.3_2019-06-14/common")
 
 elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -22,7 +20,6 @@ elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
   # This is my computer specific setting
   list(APPEND CMAKE_MODULE_PATH "/Users/dfpmts/FRUT/prefix/FRUT/cmake")  
   set(JUCE_MODULES_GLOBAL_PATH "/Users/dfpmts/JUCE/modules/")
-  set(BOOST_PATH "/opt/homebrew/Cellar/boost/1.82.0_1/include/")
   
 else()
 
@@ -56,7 +53,7 @@ jucer_project_settings(
   PROJECT_TYPE "Console Application"
   BUNDLE_IDENTIFIER "com.yourcompany.Project0"
   CXX_LANGUAGE_STANDARD "C++17"
-  HEADER_SEARCH_PATHS ${BOOST_PATH} ${ASIO_PATH} "${CMAKE_CURRENT_LIST_DIR}/../Include/"
+  HEADER_SEARCH_PATHS  ${ASIO_PATH} "${CMAKE_CURRENT_LIST_DIR}/../Include/"
 )
 
 # --------------------------------Source----------------------------------- #
