@@ -4,8 +4,6 @@
 #include "PHY_Sender.hpp"
 #include "RingBuffer.hpp"
 #include <algorithm>
-#include <boost/circular_buffer.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
