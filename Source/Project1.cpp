@@ -3,9 +3,15 @@
 #include "PHY_Receiver.hpp"
 #include "PHY_Sender.hpp"
 #include "RingBuffer.hpp"
+#include "schifra_error_processes.hpp"
+#include "schifra_galois_field.hpp"
+#include "schifra_galois_field_polynomial.hpp"
+#include "schifra_reed_solomon_bitio.hpp"
+#include "schifra_reed_solomon_block.hpp"
+#include "schifra_reed_solomon_decoder.hpp"
+#include "schifra_reed_solomon_encoder.hpp"
+#include "schifra_sequential_root_generator_polynomial_creator.hpp"
 #include <algorithm>
-#include <boost/circular_buffer.hpp>
-#include <boost/lockfree/spsc_queue.hpp>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -61,9 +67,12 @@ public:
 
 	~PHY_layer() { }
 
+public:
+	Athernet::PHY_Receiver<T> m_receiver;
+
 private:
 	Athernet::Config& config;
-	Athernet::PHY_Receiver<T> m_receiver;
+
 	Athernet::PHY_Sender<T> m_sender;
 };
 
@@ -79,14 +88,140 @@ template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_pac
 			else
 				a.push_back(0);
 		}
-		a.push_back(0);
 
 		physical_layer->send_frame(a);
 		for (const auto& x : a)
-			fprintf(sent_fd, "%d\n", x);
+			fprintf(sent_fd, "%d", x);
+		fprintf(sent_fd, "\n");
 		fflush(sent_fd);
 	}
 	fclose(sent_fd);
+}
+
+namespace RS {
+const int field_descriptor = 10;
+const int generator_polynomial_index = 120;
+const int generator_polynomial_root_count = 512;
+
+/* Reed Solomon Code Parameters */
+const int code_length = 1023;
+const int fec_length = 512;
+const int data_length = code_length - fec_length;
+
+// const int field_descriptor = 4;
+// const int generator_polynomial_index = 0;
+// const int generator_polynomial_root_count = 7;
+
+// /* Reed Solomon Code Parameters */
+// const int code_length = 15;
+// const int fec_length = 7;
+// const int data_length = code_length - fec_length;
+
+/* Instantiate Encoder and Decoder (Codec) */
+typedef schifra::reed_solomon::encoder<code_length, fec_length, data_length> encoder_t;
+typedef schifra::reed_solomon::decoder<code_length, fec_length, data_length> decoder_t;
+
+std::vector<int> encode(std::vector<int> text)
+{
+	/* Instantiate Finite Field and Generator Polynomials */
+	const schifra::galois::field field(field_descriptor, schifra::galois::primitive_polynomial_size08,
+		schifra::galois::primitive_polynomial08);
+	// const schifra::galois::field field(field_descriptor, schifra::galois::primitive_polynomial_size01,
+	// 	schifra::galois::primitive_polynomial01);
+
+	schifra::galois::field_polynomial generator_polynomial(field);
+
+	if (!schifra::make_sequential_root_generator_polynomial(
+			field, generator_polynomial_index, generator_polynomial_root_count, generator_polynomial)) {
+		std::cout << "Error - Failed to create sequential root generator!" << std::endl;
+		assert(0);
+	}
+	const encoder_t encoder(field, generator_polynomial);
+
+	auto bit_code_length = field_descriptor * code_length;
+	auto bit_data_length = field_descriptor * data_length;
+	for (int i = (text.size() - 1) % (bit_data_length) + 1; i < bit_data_length; ++i) {
+		text.push_back(0);
+	}
+	std::vector<int> encoded;
+	for (int i = 0; i < text.size(); i += bit_data_length) {
+		schifra::reed_solomon::block<code_length, fec_length> block;
+		for (int j = 0; j < data_length; ++j) {
+			block[j] = 0;
+			for (int k = 0; k < field_descriptor; ++k) {
+				block[j] |= (text[i + j * field_descriptor + k] << k);
+			}
+		}
+
+		if (!encoder.encode(block)) {
+			assert(0);
+		}
+
+		for (int i = 0; i < code_length; ++i) {
+			for (int j = 0; j < field_descriptor; ++j) {
+				if (block[i] & (1 << j)) {
+					encoded.push_back(1);
+				} else {
+					encoded.push_back(0);
+				}
+			}
+		}
+	}
+	return encoded;
+}
+
+std::vector<int> decode(std::vector<int> encoded)
+{
+	/* Instantiate Finite Field and Generator Polynomials */
+	const schifra::galois::field field(field_descriptor, schifra::galois::primitive_polynomial_size08,
+		schifra::galois::primitive_polynomial08);
+	// const schifra::galois::field field(field_descriptor, schifra::galois::primitive_polynomial_size01,
+	// 	schifra::galois::primitive_polynomial01);
+
+	schifra::galois::field_polynomial generator_polynomial(field);
+
+	if (!schifra::make_sequential_root_generator_polynomial(
+			field, generator_polynomial_index, generator_polynomial_root_count, generator_polynomial)) {
+		std::cout << "Error - Failed to create sequential root generator!" << std::endl;
+		assert(0);
+	}
+
+	const decoder_t decoder(field, generator_polynomial_index);
+
+	auto bit_code_length = field_descriptor * code_length;
+	auto bit_data_length = field_descriptor * data_length;
+
+	while (encoded.size() % bit_code_length) {
+		encoded.pop_back();
+	}
+
+	std::vector<int> decoded;
+	for (int i = 0; i < encoded.size(); i += bit_code_length) {
+
+		schifra::reed_solomon::block<code_length, fec_length> block;
+		for (int j = 0; j < code_length; ++j) {
+			block[j] = 0;
+			for (int k = 0; k < field_descriptor; ++k) {
+				block[j] |= (encoded[i + j * field_descriptor + k] << k);
+			}
+		}
+
+		if (!decoder.decode(block)) {
+			assert(0);
+		}
+
+		for (int i = 0; i < data_length; ++i) {
+			for (int j = 0; j < field_descriptor; ++j) {
+				if (block[i] & (1 << j)) {
+					decoded.push_back(1);
+				} else {
+					decoded.push_back(0);
+				}
+			}
+		}
+	}
+	return decoded;
+}
 }
 
 void* Project1_main_loop(void*)
@@ -139,9 +274,75 @@ void* Project1_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer.get());
 
-	random_test(physical_layer.get(), 100, 100);
+	// getchar();
 
-	std::this_thread::sleep_for(10s);
+	// random_test(physical_layer.get(), 100, 2 * (100 + 26));
+
+	// // getchar();
+
+	// std::this_thread::sleep_for(15s);
+
+	// return 0;
+	std::string file = "INPUT.txt";
+	std::vector<int> text;
+	int c;
+	file = NOTEBOOK_DIR + file;
+	auto fd = fopen(file.c_str(), "r");
+	while ((c = fgetc(fd)) != EOF) {
+		text.push_back(int(c - '0'));
+	}
+	if (fd)
+		fclose(fd);
+
+	auto ret = RS::encode(text);
+
+	std::cerr << ret.size() << "\n";
+
+	std::vector<int> a;
+	int packet_len = 250;
+
+	for (auto x : ret) {
+		a.push_back(x);
+		if (a.size() == packet_len) {
+			physical_layer->send_frame(a);
+			a.clear();
+		}
+	}
+
+	if (a.size()) {
+		for (int i = (int)a.size(); i < packet_len; ++i) {
+			a.push_back(0);
+		}
+		physical_layer->send_frame(a);
+	}
+
+	std::this_thread::sleep_for(15s);
+
+	std::vector<int> code;
+	std::vector<int> frame;
+	while (physical_layer->m_receiver.m_decoder_queue.pop(frame)) {
+		for (auto x : frame)
+			code.push_back(x);
+	}
+
+	auto res = RS::decode(code);
+
+	for (int i = 0; i < text.size(); ++i) {
+		if (res[i] != text[i]) {
+			std::cerr << i << "\n";
+		}
+	}
+
+	int file_id = 1;
+	int file_len = 10000;
+	std::string file_name = NOTEBOOK_DIR + std::to_string(file_id) + ".txt";
+	remove(file_name.c_str());
+	auto out_fd = fopen(file_name.c_str(), "wc");
+	for (int i = 0; i < file_len; ++i) {
+		fprintf(out_fd, "%d", res[i]);
+	}
+	fflush(out_fd);
+	fclose(out_fd);
 
 	// std::string s;
 	// while (true) {
@@ -166,18 +367,18 @@ void* Project1_main_loop(void*)
 	// 		if (fd)
 	// 			fclose(fd);
 
-	// 		int file_len = (int)text.size();
-	// 		std::vector<int> length;
-	// 		for (int i = 0; i < 16; ++i) {
-	// 			if (file_len & (1 << i)) {
-	// 				length.push_back(1);
-	// 			} else {
-	// 				length.push_back(0);
-	// 			}
-	// 		}
+	// 		// int file_len = (int)text.size();
+	// 		// std::vector<int> length;
+	// 		// for (int i = 0; i < 16; ++i) {
+	// 		// 	if (file_len & (1 << i)) {
+	// 		// 		length.push_back(1);
+	// 		// 	} else {
+	// 		// 		length.push_back(0);
+	// 		// 	}
+	// 		// }
 
 	// 		int num_packets = 100;
-	// 		int packet_len = (int)(text.size() + length.size() - 1) / num_packets + 1;
+	// 		int packet_len = (int)(text.size() - 1) / num_packets + 1;
 
 	// 		std::random_device seeder;
 	// 		const auto seed = seeder.entropy() ? seeder() : time(nullptr);
@@ -188,13 +389,13 @@ void* Project1_main_loop(void*)
 	// 		std::vector<std::vector<int>> mat;
 	// 		std::vector<int> a;
 
-	// 		for (auto x : length) {
-	// 			a.push_back(x);
-	// 			if (a.size() == packet_len) {
-	// 				mat.push_back(std::move(a));
-	// 				a.clear();
-	// 			}
-	// 		}
+	// 		// for (auto x : length) {
+	// 		// 	a.push_back(x);
+	// 		// 	if (a.size() == packet_len) {
+	// 		// 		mat.push_back(std::move(a));
+	// 		// 		a.clear();
+	// 		// 	}
+	// 		// }
 	// 		for (auto x : text) {
 	// 			a.push_back(x);
 	// 			if (a.size() == packet_len) {
@@ -210,9 +411,13 @@ void* Project1_main_loop(void*)
 	// 			mat.push_back(std::move(a));
 	// 		}
 
-	// 		double packet_fail_rate = 0.6;
-	// 		int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
+	// 		double packet_success_rate = 0.7;
+	// 		int packets_to_send = static_cast<int>((num_packets + 25) / packet_success_rate);
 
+	// 		auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
+
+	// 		std::vector<int> actual_frame;
+	// 		int to_send = 0;
 	// 		while (packets_to_send--) {
 	// 			std::vector<int> start;
 	// 			int start_point = window_start_distribution(engine);
@@ -236,7 +441,7 @@ void* Project1_main_loop(void*)
 	// 					}
 	// 				}
 	// 			}
-	// 			std::vector<int> actual_frame;
+
 	// 			for (auto x : start)
 	// 				actual_frame.push_back(x);
 	// 			for (auto x : bit_map)
@@ -244,12 +449,23 @@ void* Project1_main_loop(void*)
 	// 			for (auto x : frame)
 	// 				actual_frame.push_back(x);
 
-	// 			actual_frame.push_back(group_flag);
-	// 			actual_frame.push_back(1);
+	// 			if (to_send) {
+	// 				// for (int i = 0; i < 126; ++i)
+	// 				// 	fprintf(sent_fd, "%d", actual_frame[i]);
+	// 				// fprintf(sent_fd, "\n");
+	// 				// for (int i = 0; i < 126; ++i)
+	// 				// 	fprintf(sent_fd, "%d", actual_frame[126 + i]);
+	// 				for (int i = 0; i < actual_frame.size(); ++i)
+	// 					fprintf(sent_fd, "%d", actual_frame[i]);
 
-	// 			physical_layer->send_frame(actual_frame);
+	// 				fprintf(sent_fd, "\n");
+	// 				fflush(sent_fd);
+	// 				physical_layer->send_frame(actual_frame);
+	// 				actual_frame.clear();
+	// 			}
+	// 			to_send ^= 1;
 	// 		}
-
+	// 		fclose(sent_fd);
 	// 	} else if (s == "e") {
 	// 		break;
 	// 	}

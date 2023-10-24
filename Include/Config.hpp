@@ -52,7 +52,7 @@ public:
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 6'000;
 			preamble_f2 = 22'000;
-			preamble_length = 800;
+			preamble_length = 1000;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -90,11 +90,12 @@ public:
 		{
 			int samples_per_bit = sample_rate / bit_rate;
 			int min_f = 6000, max_f = 22000;
-			int band_width = 800;
+			// int min_f = 6000, max_f = 8400;
+			int band_width = 400;
 			for (int start_f = min_f, end_f = min_f + band_width; end_f <= max_f;
 				 start_f += band_width, end_f += band_width) {
 				carriers.push_back(
-					{ chirp(start_f, (start_f + end_f) / 2, 400), chirp((start_f + end_f) / 2, end_f, 400) });
+					{ chirp(start_f, (start_f + end_f) / 2, 500), chirp((start_f + end_f) / 2, end_f, 500) });
 			}
 		}
 
@@ -152,7 +153,7 @@ public:
 	// * Tag dispatch
 	const std::vector<float>& get_preamble(Tag<float>) const { return preamble; }
 
-	float get_preamble_energy(Tag<float>) const { return preamble_energy; }
+	double get_preamble_energy(Tag<float>) const { return preamble_energy; }
 
 	const Carriers& get_carriers(Tag<float>) const { return carriers; }
 
@@ -173,7 +174,7 @@ private:
 	int preamble_f1;
 	int preamble_f2;
 	std::vector<float> preamble;
-	float preamble_energy;
+	double preamble_energy;
 
 	int phy_frame_payload_symbol_limit = 400;
 	int phy_frame_length_num_bits = 8;

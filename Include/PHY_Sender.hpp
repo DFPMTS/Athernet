@@ -17,6 +17,7 @@ public:
 	PHY_Sender()
 		: config { Athernet::Config::get_instance() }
 	{
+		remove((NOTEBOOK_DIR + "sent.txt"s).c_str());
 		running.store(true);
 		worker = std::thread(&PHY_Sender::send_loop, this);
 	}
@@ -46,22 +47,25 @@ public:
 				append_preamble(signal);
 				append_silence(config.get_silence_length(), signal);
 
-				assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
-				Frame length;
-				for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
-					if (frame.size() & (1ULL << i)) {
-						length.push_back(1);
-					} else {
-						length.push_back(0);
-					}
+				// Frame frame_0(frame.begin(), frame.begin() + 100 + 26);
+				// Frame frame_1(frame.begin() + 100 + 26, frame.end());
+				// append_crc8(frame_0);
+				// append_crc8(frame_1);
+
+				modulate_vec(frame, signal);
+				auto recv_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "a");
+				for (int i = 0; i < 250; ++i) {
+					fprintf(recv_fd, "%d", frame[i]);
 				}
 
-				modulate_vec(length, signal);
+				fprintf(recv_fd, "\n");
+				fflush(recv_fd);
 
-				append_crc8(frame);
-				modulate_vec(frame, signal);
+				fclose(recv_fd);
 
-				append_silence(200, signal);
+				// modulate_vec(frame_1, signal);
+
+				append_silence(500, signal);
 
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {

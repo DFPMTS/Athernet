@@ -47,6 +47,31 @@ public:
 	}
 	~RingBuffer() { }
 
+	RingBuffer(std::string file)
+		: m_capacity(Athernet::Config::get_instance().get_physical_buffer_size())
+		, m_size(0)
+		, m_data(m_capacity)
+		, m_head(0)
+		, m_tail(0)
+
+	{
+		FILE* load_fd = fopen((NOTEBOOK_DIR + file).c_str(), "r");
+		if (!load_fd) {
+			std::cerr << "Unable to open " << file << "!\n";
+			assert(0);
+		}
+		m_tail = 0;
+		while (fscanf(load_fd, "%f", &m_data[m_tail]) != EOF) {
+			m_tail++;
+
+			if (m_tail % 10000 == 0)
+				std::cerr << m_tail << "\n";
+		}
+		m_size.store(m_tail);
+
+		fclose(load_fd);
+	}
+
 	void dump(std::string file)
 	{
 		// * [msvc-only] "c" mode option for WRITE THROUGH

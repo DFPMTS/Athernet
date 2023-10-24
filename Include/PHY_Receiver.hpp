@@ -21,16 +21,16 @@ public:
 		display_running.store(true);
 		display_worker = std::thread(&PHY_Receiver::display_frame, this);
 
-		decoder_running.store(true);
-		decoder_worker = std::thread(&PHY_Receiver::decoder, this);
+		// decoder_running.store(true);
+		// decoder_worker = std::thread(&PHY_Receiver::decoder, this);
 	}
 
 	~PHY_Receiver()
 	{
 		display_running.store(false);
-		decoder_running.store(false);
+		// decoder_running.store(false);
 		display_worker.join();
-		decoder_worker.join();
+		// decoder_worker.join();
 	}
 
 	void push_stream(const float* buffer, int count)
@@ -59,33 +59,21 @@ public:
 				std::this_thread::yield();
 				continue;
 			}
-			if (frame.size() > 200) {
-				int file_len = 0;
-				for (int i = 0; i < 16; ++i) {
-					file_len += (frame[i] << i);
-				}
+			if (frame.size() > 1000) {
+				int file_len = 10000;
+				// for (int i = 0; i < 16; ++i) {
+				// 	file_len += (frame[i] << i);
+				// }
 
 				++file_id;
 				std::string file_name = NOTEBOOK_DIR + std::to_string(file_id) + ".txt";
 				auto fd = fopen(file_name.c_str(), "wc");
-				int data_start = 16;
+				int data_start = 0;
 				for (int i = data_start; i < data_start + file_len; ++i) {
 					fprintf(fd, "%d", frame[i]);
 				}
 				fflush(fd);
 				fclose(fd);
-			} else if (frame.size() % 8 == 0) {
-				std::cerr << "------------------------------------------------------------\n";
-				std::cerr << "Interpreting as ASCII characters......\n";
-				for (int i = 0; i < frame.size(); i += 8) {
-					char c = 0;
-					for (int j = 0; j < 8; ++j) {
-						c += (char)((int)frame[i + j] << j);
-					}
-					putchar(c);
-				}
-				std::cerr << "\n";
-				std::cerr << "------------------------------------------------------------\n";
 			} else {
 				std::cerr << "Output as raw binary string:\n";
 				for (const auto& x : frame) {
@@ -105,16 +93,19 @@ public:
 		int empty_rows = 100;
 		int group_flag = -1;
 		int got = 0;
+		int is_first = 1;
 		while (decoder_running.load()) {
 			if (!m_decoder_queue.pop(frame)) {
 				std::this_thread::yield();
 				continue;
 			}
-			if (frame[frame.size() - 1] != group_flag) {
-				group_flag = frame[frame.size() - 1];
+			for (int i = 0; i < config.get_crc_residual_length(); ++i)
+				frame.pop_back();
+			if (is_first) {
+				is_first = 0;
 				for (int i = 0; i < 100; ++i) {
 					G[i] = std::vector<int>(100);
-					Y[i] = std::vector<int>(frame.size() - 1 - config.get_phy_coding_overhead());
+					Y[i] = std::vector<int>(frame.size() - config.get_phy_coding_overhead());
 				}
 				memset(num_ones, 0, sizeof(num_ones));
 				empty_rows = 100;
@@ -124,7 +115,6 @@ public:
 				continue;
 
 			++got;
-			frame.pop_back();
 
 			int start_point = 0;
 			for (int i = 0; i < 7; ++i) {
@@ -211,12 +201,14 @@ public:
 		}
 	}
 
+public:
+	Athernet::SyncQueue<Frame> m_decoder_queue;
+
 private:
 	Athernet::Config& config;
 	Athernet::RingBuffer<T> m_recv_buffer;
 	Athernet::FrameExtractor<T> frame_extractor;
 	Athernet::SyncQueue<Frame> m_recv_queue;
-	Athernet::SyncQueue<Frame> m_decoder_queue;
 
 	std::atomic_bool display_running;
 	std::thread display_worker;

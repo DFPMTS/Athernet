@@ -23,6 +23,7 @@ public:
 		start = 0;
 		worker = std::thread(&FrameExtractor::frame_extract_loop, this);
 		std::cerr << "Worker Started\n";
+		remove((NOTEBOOK_DIR + "recv.txt"s).c_str());
 	};
 
 	~FrameExtractor()
@@ -31,7 +32,21 @@ public:
 		running.store(false);
 		worker.join();
 		std::cerr << "End\n";
-		m_recv_buffer.dump("received.txt");
+		auto recv_fd = fopen((NOTEBOOK_DIR + "recv.txt"s).c_str(), "w");
+		Frame frame;
+		while (collected.pop(frame)) {
+			for (int i = 0; i < 250; ++i) {
+				fprintf(recv_fd, "%d", frame[i]);
+			}
+			// for (int i = 100 + config.get_crc_residual_length();
+			// 	 i < frame.size() - config.get_crc_residual_length(); ++i) {
+			// 	fprintf(recv_fd, "%d", frame[i]);
+			// }
+			fprintf(recv_fd, "\n");
+			fflush(recv_fd);
+		}
+		fclose(recv_fd);
+		// m_recv_buffer.dump("received.txt");
 	};
 
 private:
@@ -62,10 +77,13 @@ private:
 		Bits bits;
 		int received = 0;
 		int good = 0;
+		int corrected = 0;
 		T normed_corr = 0;
 		std::queue<T> norm_window;
 		T window_sum;
 		int window_size = 50;
+		int retry = 0;
+		int segments = 0;
 		while (running.load()) {
 			if (state == PhyRecvState::WAIT_HEADER) {
 				if (start > m_recv_buffer.size() - config.get_preamble_length()) {
@@ -76,8 +94,8 @@ private:
 				bool confirmed = false;
 				for (int i = start, buffer_size = m_recv_buffer.size();
 					 i <= buffer_size - config.get_preamble_length(); ++i, ++start) {
-					T dot_product = 0;
-					T received_energy = 0;
+					double dot_product = 0;
+					double received_energy = 0;
 					for (int j = 0; j < config.get_preamble_length(); ++j) {
 						dot_product += mul_small(
 							m_recv_buffer[i + j], config.get_preamble(Athernet::Tag<T>())[j], Tag<T>());
@@ -89,10 +107,10 @@ private:
 						continue;
 
 					// now we need to square dot_product, use two int32 to store result
-					auto dot_product_square = mul_large(dot_product, dot_product, Tag<T>());
+					auto dot_product_square = dot_product * dot_product;
 
 					auto preamble_received_energy_product
-						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
+						= config.get_preamble_energy(Tag<T>()) * received_energy;
 
 					auto corr = dot_product_square / preamble_received_energy_product;
 					norm_window.push(corr);
@@ -103,7 +121,7 @@ private:
 					}
 					normed_corr = pow((2 * (corr / window_sum)), 5);
 
-					if (corr > 0.05) {
+					if (corr > 0.01) {
 						if (corr > max_val) {
 							max_val = corr;
 							max_pos = i;
@@ -130,13 +148,14 @@ private:
 					}
 				}
 				if (confirmed) {
-					received++;
+					received += 1;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
 					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
 					max_val = 0;
+					retry = 0;
 					state = PhyRecvState::GET_LENGTH;
 				} else {
 					if (max_pos != -1) {
@@ -151,22 +170,29 @@ private:
 				}
 			} else if (state == PhyRecvState::GET_LENGTH) {
 				bits.clear();
-				symbols_to_collect = config.get_phy_frame_length_num_bits();
-
-				state = PhyRecvState::COLLECT_BITS;
-				next_state = PhyRecvState::GET_PAYLOAD;
+				// symbols_to_collect = config.get_phy_frame_length_num_bits();
+				segments = 1;
+				state = PhyRecvState::GET_PAYLOAD;
+				// next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
+				if (!segments) {
+					state = PhyRecvState::WAIT_HEADER;
+					continue;
+				}
+				--segments;
+
 				static int counter = 0;
-				std::cerr << "Begin Get Data" << (++counter) << "\n";
+				if (!retry)
+					std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
-				int payload_length = 0;
-				for (int i = 0; i < length.size(); ++i) {
-					if (length[i])
-						payload_length += (1 << i);
-				}
-				std::cerr << "Length: " << payload_length << "\n";
+				int payload_length = 250;
+				// for (int i = 0; i < length.size(); ++i) {
+				// 	if (length[i])
+				// 		payload_length += (1 << i);
+				// }
+				// std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 2) {
 					state = PhyRecvState::WAIT_HEADER;
@@ -180,34 +206,68 @@ private:
 
 				bits.clear();
 				// collect data and crc residual
-				symbols_to_collect = payload_length + config.get_crc_residual_length();
+				// symbols_to_collect = payload_length + config.get_crc_residual_length();//
+				symbols_to_collect = payload_length;
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::CHECK_PAYLOAD;
 			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
-				if (crc_check(bits)) {
-					// good to go
-					for (int i = 0; i < config.get_crc_residual_length(); ++i) {
-						bits.pop_back();
-					}
-					good++;
-					// dispatch normal frame to recv_queue, and coded frame to decoder_queue
-					if (!bits[bits.size() - 1]) {
-						bits.pop_back();
-						m_recv_queue.push(std::move(bits));
+				state = PhyRecvState::GET_PAYLOAD;
+				m_decoder_queue.push(bits);
+				collected.push(bits);
+				continue;
 
-					} else {
-						bits.pop_back();
-						m_decoder_queue.push(std::move(bits));
-					}
+				if (crc_check(bits)) {
+					std::cerr << "Good to go\n";
+					++good;
+					// good to go
+					collected.push(bits);
 
 				} else {
+					state = PhyRecvState::GET_PAYLOAD;
+
+					bool fixed = 0;
+					// for (int i = 0; i < bits.size(); ++i) {
+					// 	bits[i] ^= 1;
+					// 	if (crc_check(bits)) {
+					// 		fixed = 1;
+					// 		break;
+					// 	}
+					// 	bits[i] ^= 1;
+					// }
+
+					collected.push(bits);
+					if (fixed) {
+						corrected++;
+						std::cerr << "----------------------------------Corrected\n";
+						m_decoder_queue.push(bits);
+						continue;
+					}
+					// for (int i = 0; i < bits.size(); ++i) {
+					// 	bits[i] ^= 1;
+					// 	for (int j = i + 1; j < bits.size(); ++j) {
+					// 		bits[j] ^= 1;
+					// 		if (crc_check(bits)) {
+					// 			fixed = 1;
+					// 			break;
+					// 		}
+					// 		bits[j] ^= 1;
+					// 	}
+					// 	bits[i] ^= 1;
+					// }
+					// collected.push(bits);
+					// if (fixed) {
+					// 	corrected++;
+					// 	std::cerr << "Corrected\n";
+					// 	continue;
+					// } else {
+					// 	std::cerr << "                                    ";
+					// 	std::cerr
+					// 		<< "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// 	start = saved_start;
+					// }
 					// discard
-					std::cerr << "                                    ";
-					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
-					start = saved_start;
 				}
 
-				state = PhyRecvState::WAIT_HEADER;
 			} else if (state == PhyRecvState::COLLECT_BITS) {
 				if (!symbols_to_collect) {
 					state = next_state;
@@ -226,7 +286,8 @@ private:
 		if constexpr (Athernet::DUMP_RECEIVED) {
 			std::cerr << "--------[FrameExtractor]--------\n";
 			std::cerr << "     Received:      " << received << "\n";
-			std::cerr << "     Bad:           " << received - good << "\n";
+			std::cerr << "     Good:          " << good << "\n";
+			std::cerr << "     Corrected:     " << corrected << "\n";
 		}
 	}
 
@@ -264,8 +325,8 @@ private:
 				T max_val_1 = 0;
 				T sum_of_square_0 = 0;
 				T sum_of_square_1 = 0;
-				for (int offset = config.get_silence_length() - config.get_silence_length() / 3;
-					 offset < config.get_silence_length() + config.get_silence_length() / 3; ++offset) {
+				for (int offset = config.get_silence_length() - config.get_silence_length() / 4;
+					 offset < config.get_silence_length() + config.get_silence_length() / 4; ++offset) {
 					T dot_product_0 = 0;
 					T dot_product_1 = 0;
 					for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -277,7 +338,7 @@ private:
 					sum_of_square_0 += dot_product_0 * dot_product_0;
 					sum_of_square_1 += dot_product_1 * dot_product_1;
 				}
-				if (sum_of_square_0 > sum_of_square_1) {
+				if (max_val_0 > max_val_1) {
 					bits.push_back(0);
 				} else {
 					bits.push_back(1);
@@ -435,5 +496,6 @@ private:
 	std::atomic_bool running;
 	int start;
 	PhyRecvState state = PhyRecvState::WAIT_HEADER;
+	Athernet::SyncQueue<Frame> collected;
 };
 }
