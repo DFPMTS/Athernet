@@ -1,5 +1,4 @@
 #include "JuceHeader.h"
-#include <boost/circular_buffer.hpp>
 #include <chrono>
 #include <cmath>
 #include <deque>

@@ -25,7 +25,7 @@
 
 #define PI acos(-1)
 
-// #define WIN
+#define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -170,6 +170,8 @@ std::vector<int> encode(std::vector<int> text)
 	return encoded;
 }
 
+bool failed = 0;
+
 std::vector<int> decode(std::vector<int> encoded)
 {
 	/* Instantiate Finite Field and Generator Polynomials */
@@ -207,7 +209,9 @@ std::vector<int> decode(std::vector<int> encoded)
 		}
 
 		if (!decoder.decode(block)) {
-			assert(0);
+			std::cerr << "Decode failed !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+					  << "\n";
+			failed = 1;
 		}
 
 		for (int i = 0; i < data_length; ++i) {
@@ -259,7 +263,7 @@ void* Project1_main_loop(void*)
 		std::cerr << "-------------------\n";
 	}
 
-	device_setup.inputDeviceName = "MacBook Pro Microphone";
+	// device_setup.inputDeviceName = "MacBook Pro Microphone";
 	// device_setup.inputDeviceName = "USB Audio Device";
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 	// device_setup.outputDeviceName = "USB Audio Device";
@@ -316,7 +320,7 @@ void* Project1_main_loop(void*)
 		physical_layer->send_frame(a);
 	}
 
-	std::this_thread::sleep_for(15s);
+	getchar();
 
 	std::vector<int> code;
 	std::vector<int> frame;
@@ -325,24 +329,26 @@ void* Project1_main_loop(void*)
 			code.push_back(x);
 	}
 
-	auto res = RS::decode(code);
-
-	for (int i = 0; i < text.size(); ++i) {
-		if (res[i] != text[i]) {
-			std::cerr << i << "\n";
-		}
-	}
-
-	int file_id = 1;
+	int file_id = 12345;
 	int file_len = 10000;
 	std::string file_name = NOTEBOOK_DIR + std::to_string(file_id) + ".txt";
 	remove(file_name.c_str());
-	auto out_fd = fopen(file_name.c_str(), "wc");
-	for (int i = 0; i < file_len; ++i) {
-		fprintf(out_fd, "%d", res[i]);
+
+	auto res = RS::decode(code);
+
+	if (!RS::failed) {
+		for (int i = 0; i < text.size(); ++i) {
+			if (res[i] != text[i]) {
+				std::cerr << i << "\n";
+			}
+		}
+		auto out_fd = fopen(file_name.c_str(), "wc");
+		for (int i = 0; i < file_len; ++i) {
+			fprintf(out_fd, "%d", res[i]);
+		}
+		fflush(out_fd);
+		fclose(out_fd);
 	}
-	fflush(out_fd);
-	fclose(out_fd);
 
 	// std::string s;
 	// while (true) {

@@ -9,7 +9,7 @@
 
 #define PI acos(-1)
 
-// #define WIN
+#define WIN
 
 using namespace std::string_literals;
 
@@ -89,9 +89,9 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			int min_f = 6000, max_f = 22000;
+			int min_f = 4000, max_f = 16000;
 			// int min_f = 6000, max_f = 8400;
-			int band_width = 400;
+			int band_width = 300;
 			for (int start_f = min_f, end_f = min_f + band_width; end_f <= max_f;
 				 start_f += band_width, end_f += band_width) {
 				carriers.push_back(

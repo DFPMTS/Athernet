@@ -80,7 +80,7 @@ private:
 		int corrected = 0;
 		T normed_corr = 0;
 		std::queue<T> norm_window;
-		T window_sum;
+		T window_sum = 0;
 		int window_size = 50;
 		int retry = 0;
 		int segments = 0;
@@ -121,7 +121,7 @@ private:
 					}
 					normed_corr = pow((2 * (corr / window_sum)), 5);
 
-					if (corr > 0.01) {
+					if (corr > 0.02) {
 						if (corr > max_val) {
 							max_val = corr;
 							max_pos = i;
