@@ -180,6 +180,7 @@ void* Project1_main_loop(void*)
 		std::cerr << "-------Input-------\n";
 		for (int i = 0; i < input_devices.size(); ++i)
 			std::cerr << (i == default_input ? "x " : "  ") << input_devices[i] << "\n";
+		device_setup.inputDeviceName = input_devices[4];
 	}
 
 	{
@@ -190,6 +191,7 @@ void* Project1_main_loop(void*)
 		for (int i = 0; i < output_devices.size(); ++i)
 			std::cerr << (i == default_output ? "x " : "  ") << output_devices[i] << "\n";
 		std::cerr << "-------------------\n";
+		device_setup.outputDeviceName = output_devices[5];
 	}
 
 	// device_setup.inputDeviceName = "MacBook Pro Microphone";
