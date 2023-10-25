@@ -54,6 +54,10 @@ public:
 			outputChannelData[1][i] = 0;
 		}
 
+		// for (int i = 0; i < numSamples; ++i) {
+		// 	outputChannelData[0][i] = 0;
+		// }
+
 		// MISO for now
 		m_receiver.push_stream(inputChannelData[0], numSamples);
 	}

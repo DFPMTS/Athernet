@@ -61,10 +61,10 @@ public:
 					signal.clear();
 					if (i == 0) {
 						append_preamble(signal);
-						modulate_vec({ 0, 1 }, signal);
+						modulate_vec_traning({ 0, 1 }, signal);
 					} else {
 						append_silence(config.get_preamble_length(), signal);
-						modulate_vec({ 0, 0 }, signal);
+						modulate_vec_traning({ 0, 0 }, signal);
 					}
 					append_vec(data_signal, signal);
 					append_silence(200, signal);
@@ -111,6 +111,24 @@ public:
 private:
 	void append_preamble(Signal& signal) { append_vec(config.get_preamble(Athernet::Tag<T>()), signal); }
 
+	void modulate_vec_traning(const Frame& frame, Signal& signal)
+	{
+		for (int i = 0; i < frame.size(); i += config.get_num_carriers()) {
+			Signal this_piece(config.get_phy_frame_CP_length() + config.get_symbol_length()
+				+ config.get_phy_frame_CP_length());
+			for (int j = 0; j < config.get_num_carriers(); ++j) {
+				if ((i + j < frame.size()) ? frame[i + j] : 0) {
+					add_carrier(j, 1, this_piece);
+				} else {
+					add_carrier(j, 0, this_piece);
+				}
+			}
+			add_CyclicPrefix(this_piece);
+			add_CyclicPostfix(this_piece);
+			append_vec(this_piece, signal);
+		}
+	}
+
 	void modulate_vec(const Frame& frame, Signal& signal)
 	{
 		for (int i = 0; i < frame.size(); i += config.get_num_carriers()) {
@@ -122,7 +140,7 @@ private:
 					add_carrier(j, 0, this_piece);
 				}
 			}
-			add_CP(this_piece);
+			add_CyclicPrefix(this_piece);
 			append_vec(this_piece, signal);
 		}
 	}
@@ -135,10 +153,17 @@ private:
 		}
 	}
 
-	void add_CP(Signal& signal)
+	void add_CyclicPrefix(Signal& signal)
 	{
 		for (int i = 0; i < config.get_phy_frame_CP_length(); ++i) {
 			signal[i] = signal[config.get_symbol_length() + i];
+		}
+	}
+	void add_CyclicPostfix(Signal& signal)
+	{
+		for (int i = 0; i < config.get_phy_frame_CP_length(); ++i) {
+			signal[config.get_symbol_length() + config.get_phy_frame_CP_length() + i]
+				= signal[config.get_phy_frame_CP_length() + i];
 		}
 	}
 

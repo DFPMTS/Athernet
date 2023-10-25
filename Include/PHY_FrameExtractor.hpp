@@ -9,6 +9,7 @@ namespace Athernet {
 template <typename T> class FrameExtractor {
 	using SoftUInt64 = std::pair<uint32_t, uint32_t>;
 	using Bits = std::vector<int>;
+	using Samples = std::vector<T>;
 	using Frame = std::vector<int>;
 
 public:
@@ -48,6 +49,7 @@ private:
 		PhyRecvState next_state = PhyRecvState::INVALID_STATE;
 		Bits length;
 		Bits bits;
+		Samples samples;
 		int received = 0;
 		int good = 0;
 		while (running.load()) {
@@ -113,7 +115,11 @@ private:
 					saved_start = 0;
 					max_pos = -1;
 					max_val = 0;
-					state = PhyRecvState::ESTIMATE_CHANNEL;
+
+					samples.clear();
+					symbols_to_collect = 2;
+					state = PhyRecvState::COLLECT_SAMPLES;
+					next_state = PhyRecvState::ESTIMATE_CHANNEL;
 				} else {
 					if (max_pos != -1) {
 						// discard everything until max_pos
@@ -126,19 +132,24 @@ private:
 					}
 				}
 			} else if (state == PhyRecvState::ESTIMATE_CHANNEL) {
-				bits.clear();
-				next_state = PhyRecvState::GET_LENGTH;
-				state = PhyRecvState::COLLECT_BITS;
-				symbols_to_collect = 2;
+				// bits.clear();
+				// next_state = PhyRecvState::GET_LENGTH;
+				// state = PhyRecvState::COLLECT_BITS;
+				// symbols_to_collect = 2;
+				for (int i = 0; i < config.get_symbol_length() * 2; ++i) {
+					std::cerr << samples[i] << ",";
+				}
+				std::cerr << "\n";
+				state = PhyRecvState::GET_LENGTH;
 			} else if (state == PhyRecvState::GET_LENGTH) {
 				std::cerr << "Training sequence:  ";
 				for (auto x : bits) {
 					std::cerr << x;
 				}
 				std::cerr << "\n";
+
 				bits.clear();
 				symbols_to_collect = config.get_phy_frame_length_num_bits();
-
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
@@ -194,6 +205,15 @@ private:
 				}
 
 				state = PhyRecvState::WAIT_HEADER;
+			} else if (state == PhyRecvState::COLLECT_SAMPLES) {
+				if (!symbols_to_collect) {
+					state = next_state;
+				} else {
+					symbols_to_collect -= get_samples(symbols_to_collect, samples);
+					if (symbols_to_collect) {
+						std::this_thread::yield();
+					}
+				}
 			} else if (state == PhyRecvState::COLLECT_BITS) {
 				if (!symbols_to_collect) {
 					state = next_state;
@@ -214,6 +234,30 @@ private:
 			std::cerr << "     Received:      " << received << "\n";
 			std::cerr << "     Bad:           " << received - good << "\n";
 		}
+	}
+
+	int get_samples(int count, Samples& samples)
+	{
+		int rightmost_pos = m_recv_buffer.size() - config.get_phy_frame_CP_length()
+			- config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
+		int collected_count = 0;
+
+		for (int i = start; i < rightmost_pos && collected_count < count;
+			 i += config.get_phy_frame_CP_length() + config.get_symbol_length()
+				 + config.get_phy_frame_CP_length(),
+				 start += config.get_phy_frame_CP_length() + config.get_symbol_length()
+				 + config.get_phy_frame_CP_length()) {
+			for (const auto& carrier : config.get_carriers(Tag<T>())) {
+				T dot_product = 0;
+				for (int j = 0; j < config.get_symbol_length(); ++j) {
+					samples.push_back(m_recv_buffer[i + config.get_phy_frame_CP_length() + j]);
+				}
+				if (++collected_count >= count)
+					break;
+			}
+		}
+
+		return collected_count;
 	}
 
 	bool crc_check(Bits bits)
@@ -398,6 +442,7 @@ private:
 		GET_PAYLOAD,
 		CHECK_PAYLOAD,
 		COLLECT_BITS,
+		COLLECT_SAMPLES,
 		INVALID_STATE
 	};
 
