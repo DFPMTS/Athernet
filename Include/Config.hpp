@@ -43,7 +43,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 2000;
+		bit_rate = 1500;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -98,7 +98,7 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			std::vector<int> carrier_frequencies = { 4000 };
+			std::vector<int> carrier_frequencies = { 6000 };
 
 			for (auto carrier_f : carrier_frequencies) {
 				std::vector<float> carrier_0, carrier_1;
@@ -214,7 +214,7 @@ private:
 	// ! REVERSED for simplicity
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
-	int physical_buffer_size = 10'0000;
+	int physical_buffer_size = 200'0000;
 };
 
 }

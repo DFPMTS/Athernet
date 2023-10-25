@@ -80,8 +80,8 @@ private:
 
 					if (greater_than(mul_large_small(dot_product_square, 4, Tag<T>()),
 							preamble_received_energy_product, Tag<T>())) {
-						if (dot_product > max_val) {
-							max_val = dot_product;
+						if (dot_product_square > max_val) {
+							max_val = dot_product_square;
 							max_pos = i;
 							// std::cerr << "Greater:  " << max_val << "\n";
 							// std::cerr << preamble_received_energy_product.first << " "
@@ -108,12 +108,12 @@ private:
 				if (confirmed) {
 					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
-					// std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
 					max_val = 0;
-					state = PhyRecvState::GET_LENGTH;
+					state = PhyRecvState::ESTIMATE_CHANNEL;
 				} else {
 					if (max_pos != -1) {
 						// discard everything until max_pos
@@ -125,7 +125,17 @@ private:
 						start = 0;
 					}
 				}
+			} else if (state == PhyRecvState::ESTIMATE_CHANNEL) {
+				bits.clear();
+				next_state = PhyRecvState::GET_LENGTH;
+				state = PhyRecvState::COLLECT_BITS;
+				symbols_to_collect = 2;
 			} else if (state == PhyRecvState::GET_LENGTH) {
+				std::cerr << "Training sequence:  ";
+				for (auto x : bits) {
+					std::cerr << x;
+				}
+				std::cerr << "\n";
 				bits.clear();
 				symbols_to_collect = config.get_phy_frame_length_num_bits();
 
@@ -133,7 +143,7 @@ private:
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
 				static int counter = 0;
-				// std::cerr << "Begin Get Data" << (++counter) << "\n";
+				std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
@@ -142,7 +152,7 @@ private:
 					if (length[i])
 						payload_length += (1 << i);
 				}
-				// std::cerr << "Length: " << payload_length << "\n";
+				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 2) {
 					state = PhyRecvState::WAIT_HEADER;
@@ -383,6 +393,7 @@ private:
 
 	enum class PhyRecvState {
 		WAIT_HEADER,
+		ESTIMATE_CHANNEL,
 		GET_LENGTH,
 		GET_PAYLOAD,
 		CHECK_PAYLOAD,

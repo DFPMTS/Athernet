@@ -27,12 +27,15 @@ public:
 
 	void push_frame(const Frame& frame) { m_send_queue.push(frame); }
 	void push_frame(Frame&& frame) { m_send_queue.push(std::move(frame)); }
-
+	using MI_Signal = std::vector<Signal>;
 	void send_loop()
 	{
 		state = PhySendState::PROCESS_FRAME;
+		Signal data_signal;
 		Signal signal;
 		std::vector<int> frame;
+		MI_Signal mi_signal;
+		int tx1_sent = 0, tx2_sent = 0;
 		while (running.load()) {
 			if (state == PhySendState::PROCESS_FRAME) {
 				if (!m_send_queue.pop(frame)) {
@@ -40,10 +43,7 @@ public:
 					continue;
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
-				// frame date is zero-padded to a fixed length
-				signal.clear();
-				append_preamble(signal);
-
+				data_signal.clear();
 				assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
 				Frame length;
 				for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
@@ -53,21 +53,43 @@ public:
 						length.push_back(0);
 					}
 				}
-				modulate_vec(length, signal);
-
+				modulate_vec(length, data_signal);
 				append_crc8(frame);
-				modulate_vec(frame, signal);
+				modulate_vec(frame, data_signal);
 
-				append_silence(signal);
-				append_silence(signal);
+				for (int i = 0; i < 2; ++i) {
+					signal.clear();
+					append_preamble(signal);
+					if (i == 0) {
+						modulate_vec({ 0, 1 }, signal);
+					} else {
+						modulate_vec({ 0, 0 }, signal);
+					}
+					append_vec(data_signal, signal);
+					append_silence(signal);
+					mi_signal.push_back(std::move(signal));
+				}
+				tx1_sent = 0;
+				tx2_sent = 0;
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {
-				if (!m_send_buffer.push(signal)) {
-					std::this_thread::yield();
-					continue;
-				} else {
-					state = PhySendState::PROCESS_FRAME;
+				if (!tx1_sent) {
+					if (!m_Tx1_buffer.push(mi_signal[0])) {
+						std::this_thread::yield();
+						continue;
+					} else {
+						tx1_sent = true;
+					}
 				}
+				if (!tx2_sent) {
+					if (!m_Tx2_buffer.push(mi_signal[1])) {
+						std::this_thread::yield();
+						continue;
+					} else {
+						tx2_sent = true;
+					}
+				}
+				state = PhySendState::PROCESS_FRAME;
 			} else if (state == PhySendState::INVALID_STATE) {
 				std::cerr << "Invalid state!\n";
 				assert(0);
@@ -75,9 +97,14 @@ public:
 		}
 	}
 
-	int pop_stream(float* buffer, int count)
+	int Tx1_pop_stream(float* buffer, int count)
 	{
-		return m_send_buffer.pop_with_conversion_to_float(buffer, count);
+		return m_Tx1_buffer.pop_with_conversion_to_float(buffer, count);
+	}
+
+	int Tx2_pop_stream(float* buffer, int count)
+	{
+		return m_Tx2_buffer.pop_with_conversion_to_float(buffer, count);
 	}
 
 private:
@@ -145,7 +172,8 @@ private:
 	Athernet::SyncQueue<Frame> m_send_queue;
 	std::thread worker;
 	std::atomic_bool running;
-	Athernet::RingBuffer<T> m_send_buffer;
+	Athernet::RingBuffer<T> m_Tx1_buffer;
+	Athernet::RingBuffer<T> m_Tx2_buffer;
 	Athernet::Config& config;
 	Signal m_silence = Signal(200);
 };

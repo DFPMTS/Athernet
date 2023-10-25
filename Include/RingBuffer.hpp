@@ -62,7 +62,7 @@ public:
 			std::cerr << "Unable to open " << file << "!\n";
 			assert(0);
 		}
-		for (int i = 0; i < m_capacity; ++i) {
+		for (int i = 0; i < m_head; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
 				fprintf(receive_fd, "%f ", m_data[i]);
 			} else {
@@ -129,6 +129,7 @@ public:
 
 		for (int i = 0; i < popped_count; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
+				// std::cerr << m_head << "\n";
 				dest[i] = m_data[m_head];
 			} else {
 				dest[i] = static_cast<float>(m_data[m_head]) / Athernet::SEND_FLOAT_INT_SCALE;
@@ -169,7 +170,7 @@ public:
 	int show_tail() { return m_tail; }
 
 private:
-	int m_capacity;
+	const int m_capacity;
 	std::atomic<int> m_size;
 	int m_head;
 	int m_tail;
