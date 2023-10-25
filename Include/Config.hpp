@@ -98,7 +98,7 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			std::vector<int> carrier_frequencies = { 6000, 10000 };
+			std::vector<int> carrier_frequencies = { 4000 };
 
 			for (auto carrier_f : carrier_frequencies) {
 				std::vector<float> carrier_0, carrier_1;
