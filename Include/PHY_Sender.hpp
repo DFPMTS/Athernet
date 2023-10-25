@@ -59,14 +59,15 @@ public:
 
 				for (int i = 0; i < 2; ++i) {
 					signal.clear();
-					append_preamble(signal);
 					if (i == 0) {
+						append_preamble(signal);
 						modulate_vec({ 0, 1 }, signal);
 					} else {
+						append_silence(config.get_preamble_length(), signal);
 						modulate_vec({ 0, 0 }, signal);
 					}
 					append_vec(data_signal, signal);
-					append_silence(signal);
+					append_silence(200, signal);
 					mi_signal.push_back(std::move(signal));
 				}
 				tx1_sent = 0;
@@ -159,7 +160,11 @@ private:
 		frame = std::move(saved_frame);
 	}
 
-	void append_silence(Signal& signal) { append_vec(m_silence, signal); }
+	void append_silence(int count, Signal& signal)
+	{
+		for (int i = 0; i < count; ++i)
+			signal.push_back(0);
+	}
 
 	void append_vec(const Signal& from, Signal& to)
 	{
@@ -175,6 +180,5 @@ private:
 	Athernet::RingBuffer<T> m_Tx1_buffer;
 	Athernet::RingBuffer<T> m_Tx2_buffer;
 	Athernet::Config& config;
-	Signal m_silence = Signal(200);
 };
 }
