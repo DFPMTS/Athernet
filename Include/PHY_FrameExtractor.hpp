@@ -369,7 +369,7 @@ private:
 		int converted_count = 0;
 		int step = config.get_phy_frame_CP_length() + config.get_symbol_length();
 
-		for (int i = start; i < rightmost_pos && converted_count < count; i += step) {
+		for (int i = start; i < rightmost_pos && converted_count < count; i += step, start += step) {
 			for (const auto& carrier : config.get_carriers(Tag<T>())) {
 				T dot_product = 0;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -381,7 +381,6 @@ private:
 				} else {
 					bits.push_back(1);
 				}
-				start += step;
 				if (++converted_count >= count)
 					break;
 			}
