@@ -141,33 +141,33 @@ private:
 					y2.push_back(samples[config.get_symbol_length() + i]);
 				}
 
-				for (auto x : y1) {
+				Samples h_11_cosx(config.get_symbol_length());
+				for (int i = 0; i < config.get_symbol_length(); ++i) {
+					h_11_cosx[i] = (y1[i] + y2[i]) / 2;
+				}
+
+				Samples h_21_cosx(config.get_symbol_length());
+				for (int i = 0; i < config.get_symbol_length(); ++i) {
+					h_21_cosx[i] = (y2[i] - y1[i]) / 2;
+				}
+
+				for (auto x : h_11_cosx) {
 					std::cerr << x << ", ";
 				}
 				std::cerr << "\n";
-				phase_detect(y1);
 
-				for (auto x : y2) {
+				auto [h_11_scale, h_11_shift] = phase_detect(h_11_cosx);
+
+				for (auto x : h_21_cosx) {
 					std::cerr << x << ", ";
 				}
 				std::cerr << "\n";
-				phase_detect(y2);
 
-				// Samples h_11_cosx(config.get_symbol_length());
-				// for (int i = 0; i < config.get_symbol_length(); ++i) {
-				// 	h_11_cosx[i] = (y1[i] + y2[i]) / 2;
-				// }
-
-				// Samples h_21_cosx(config.get_symbol_length());
-				// for (int i = 0; i < config.get_symbol_length(); ++i) {
-				// 	h_21_cosx[i] = (y2[i] - y1[i]) / 2;
-				// }
-
-				// auto [h_11_scale, h_11_shift] = phase_detect(h_11_cosx);
-				// auto [h_21_scale, h_21_shift] = phase_detect(h_21_cosx);
+				auto [h_21_scale, h_21_shift] = phase_detect(h_21_cosx);
 
 				state = PhyRecvState::GET_LENGTH;
 			} else if (state == PhyRecvState::GET_LENGTH) {
+				std::cerr << "start:  " << start << "\n";
 				bits.clear();
 				symbols_to_collect = config.get_phy_frame_length_num_bits();
 				state = PhyRecvState::COLLECT_BITS;
@@ -327,20 +327,16 @@ private:
 		int rightmost_pos = m_recv_buffer.size() - config.get_phy_frame_CP_length()
 			- config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
 		int collected_count = 0;
+		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
+			+ config.get_phy_frame_CP_length();
 
-		for (int i = start; i < rightmost_pos && collected_count < count;
-			 i += config.get_phy_frame_CP_length() + config.get_symbol_length()
-				 + config.get_phy_frame_CP_length(),
-				 start += config.get_phy_frame_CP_length() + config.get_symbol_length()
-				 + config.get_phy_frame_CP_length()) {
-			for (const auto& carrier : config.get_carriers(Tag<T>())) {
-				T dot_product = 0;
-				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					samples.push_back(m_recv_buffer[i + config.get_phy_frame_CP_length() + j]);
-				}
-				if (++collected_count >= count)
-					break;
+		for (int i = start; i < rightmost_pos && collected_count < count; i += step) {
+			for (int j = 0; j < config.get_symbol_length(); ++j) {
+				samples.push_back(m_recv_buffer[i + config.get_phy_frame_CP_length() + j]);
 			}
+			start += step;
+			if (++collected_count >= count)
+				break;
 		}
 
 		return collected_count;
@@ -371,10 +367,9 @@ private:
 		int rightmost_pos
 			= m_recv_buffer.size() - config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
 		int converted_count = 0;
+		int step = config.get_phy_frame_CP_length() + config.get_symbol_length();
 
-		for (int i = start; i < rightmost_pos && converted_count < count;
-			 i += config.get_phy_frame_CP_length() + config.get_symbol_length(),
-				 start += config.get_phy_frame_CP_length() + config.get_symbol_length()) {
+		for (int i = start; i < rightmost_pos && converted_count < count; i += step) {
 			for (const auto& carrier : config.get_carriers(Tag<T>())) {
 				T dot_product = 0;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -386,6 +381,7 @@ private:
 				} else {
 					bits.push_back(1);
 				}
+				start += step;
 				if (++converted_count >= count)
 					break;
 			}

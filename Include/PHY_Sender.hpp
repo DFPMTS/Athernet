@@ -43,7 +43,6 @@ public:
 					continue;
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
-				data_signal.clear();
 				assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
 				Frame length;
 				for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
@@ -53,6 +52,7 @@ public:
 						length.push_back(0);
 					}
 				}
+				data_signal.clear();
 				modulate_vec(length, data_signal);
 				append_crc8(frame);
 				modulate_vec(frame, data_signal);
@@ -61,10 +61,10 @@ public:
 					signal.clear();
 					if (i == 0) {
 						append_preamble(signal);
-						modulate_vec_traning({ 0, 1 }, signal);
+						modulate_vec_traning({ 0, 0 }, signal);
 					} else {
 						append_silence(config.get_preamble_length(), signal);
-						modulate_vec_traning({ 0, 0 }, signal);
+						modulate_vec_traning({ 1, 0 }, signal);
 					}
 					append_vec(data_signal, signal);
 					append_silence(200, signal);

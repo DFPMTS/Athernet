@@ -44,18 +44,18 @@ public:
 	{
 		int samples_wrote = 0;
 
-		samples_wrote = m_sender.Tx1_pop_stream(outputChannelData[0], numSamples);
-		for (int i = samples_wrote; i < numSamples; ++i) {
-			outputChannelData[0][i] = 0;
-		}
-
 		samples_wrote = m_sender.Tx2_pop_stream(outputChannelData[1], numSamples);
 		for (int i = samples_wrote; i < numSamples; ++i) {
 			outputChannelData[1][i] = 0;
 		}
 
+		samples_wrote = m_sender.Tx1_pop_stream(outputChannelData[0], samples_wrote);
+		for (int i = samples_wrote; i < numSamples; ++i) {
+			outputChannelData[0][i] = 0;
+		}
+
 		// for (int i = 0; i < numSamples; ++i) {
-		// 	outputChannelData[0][i] = 0;
+		// 	outputChannelData[1][i] = 0;
 		// }
 
 		// MISO for now
