@@ -101,12 +101,14 @@ public:
 			std::vector<int> carrier_frequencies = { 6000 };
 
 			for (auto carrier_f : carrier_frequencies) {
-				std::vector<float> carrier_0, carrier_1;
+				std::vector<float> carrier_0, carrier_1, axis;
 				for (int i = 0; i < samples_per_bit; ++i) {
 					carrier_0.push_back(static_cast<float>(cos(2 * PI * carrier_f * i / sample_rate)));
 					carrier_1.push_back(static_cast<float>(-cos(2 * PI * carrier_f * i / sample_rate)));
+					axis.push_back(static_cast<float>(sin(2 * PI * carrier_f * i / sample_rate)));
 				}
 				carriers.push_back({ carrier_0, carrier_1 });
+				axes.push_back(axis);
 
 				std::vector<int> carrier_0_int, carrier_1_int;
 				for (int i = 0; i < samples_per_bit; ++i) {
@@ -179,6 +181,8 @@ public:
 	const Carriers& get_carriers(Tag<float>) const { return carriers; }
 	const CarriersInt& get_carriers(Tag<int>) const { return carriers_int; }
 
+	const std::vector<std::vector<float>>& get_axes(Tag<float>) const { return axes; }
+
 	int get_num_carriers() const { return carriers.size(); }
 
 	int get_symbol_length() const { return static_cast<int>(carriers[0][0].size()); }
@@ -208,6 +212,7 @@ private:
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
 
+	std::vector<std::vector<float>> axes;
 	std::vector<std::vector<std::vector<float>>> carriers;
 	std::vector<std::vector<std::vector<int>>> carriers_int;
 
