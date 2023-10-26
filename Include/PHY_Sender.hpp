@@ -66,21 +66,19 @@ public:
 					signal.clear();
 					if (i == 0) {
 						append_preamble(signal);
-						// append_silence(100, signal);
-						modulate_vec_traning({ 0, -1 }, signal);
+						modulate_vec_training({ 0, -1 }, signal);
 					} else {
 						append_silence(config.get_preamble_length(), signal);
-						// append_silence(100, signal);
-						modulate_vec_traning({ -1, 0 }, signal);
+						modulate_vec_training({ -1, 0 }, signal);
 					}
 					append_silence(50, signal);
 					for (int j = 0; j < actual_frame.size(); j += 2) {
 						int s1 = actual_frame[j];
 						int s2 = actual_frame[j + 1];
 						if (i == 0) {
-							modulate_vec_traning({ s1, s2 ^ 1 }, signal);
+							modulate_vec({ s1, s2 ^ 1 }, signal);
 						} else {
-							modulate_vec_traning({ s2, s1 }, signal);
+							modulate_vec({ s2, s1 }, signal);
 						}
 					}
 					append_silence(200, signal);
@@ -131,7 +129,7 @@ public:
 private:
 	void append_preamble(Signal& signal) { append_vec(config.get_preamble(Athernet::Tag<T>()), signal); }
 
-	void modulate_vec_traning(const Frame& frame, Signal& signal)
+	void modulate_vec_training(const Frame& frame, Signal& signal)
 	{
 		for (int i = 0; i < frame.size(); i += config.get_num_carriers()) {
 			Signal this_piece(config.get_phy_frame_CP_length() + config.get_symbol_length()

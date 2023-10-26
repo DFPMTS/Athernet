@@ -16,7 +16,7 @@ public:
 	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue,
 		Athernet::SyncQueue<Frame>& decoder_queue)
 		: config { Athernet::Config::get_instance() }
-		, m_recv_buffer { recv_buffer }
+		, m_Rx1_buffer { recv_buffer }
 		, m_recv_queue { recv_queue }
 		, m_decoder_queue { decoder_queue }
 	{
@@ -32,7 +32,7 @@ public:
 		running.store(false);
 		worker.join();
 		std::cerr << "End\n";
-		m_recv_buffer.dump("received.txt");
+		m_Rx1_buffer.dump("received.txt");
 	};
 
 private:
@@ -59,21 +59,21 @@ private:
 		int good = 0;
 		while (running.load()) {
 			if (state == PhyRecvState::WAIT_HEADER) {
-				if (start > m_recv_buffer.size() - config.get_preamble_length()) {
+				if (start > m_Rx1_buffer.size() - config.get_preamble_length()) {
 					std::this_thread::yield();
 					continue;
 				}
 
 				bool confirmed = false;
-				for (int i = start, buffer_size = m_recv_buffer.size();
+				for (int i = start, buffer_size = m_Rx1_buffer.size();
 					 i <= buffer_size - config.get_preamble_length(); ++i, ++start) {
 					T dot_product = 0;
 					T received_energy = 0;
 					for (int j = 0; j < config.get_preamble_length(); ++j) {
 						dot_product += mul_small(
-							m_recv_buffer[i + j], config.get_preamble(Athernet::Tag<T>())[j], Tag<T>());
+							m_Rx1_buffer[i + j], config.get_preamble(Athernet::Tag<T>())[j], Tag<T>());
 
-						received_energy += mul_small(m_recv_buffer[i + j], m_recv_buffer[i + j], Tag<T>());
+						received_energy += mul_small(m_Rx1_buffer[i + j], m_Rx1_buffer[i + j], Tag<T>());
 					}
 
 					if (dot_product < 0)
@@ -114,8 +114,8 @@ private:
 				}
 				if (confirmed) {
 					received++;
-					m_recv_buffer.discard(max_pos + config.get_preamble_length());
-					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					m_Rx1_buffer.discard(max_pos + config.get_preamble_length());
+					std::cerr << "head>  " << m_Rx1_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
@@ -128,11 +128,11 @@ private:
 				} else {
 					if (max_pos != -1) {
 						// discard everything until max_pos
-						m_recv_buffer.discard(max_pos);
+						m_Rx1_buffer.discard(max_pos);
 						max_pos = 0;
 						start -= max_pos;
 					} else {
-						m_recv_buffer.discard(start);
+						m_Rx1_buffer.discard(start);
 						start = 0;
 					}
 				}
@@ -159,19 +159,20 @@ private:
 				h_11_cosx = y1;
 				h_21_cosx = y2;
 
-				for (auto x : h_11_cosx) {
-					std::cerr << x << ", ";
-				}
-				std::cerr << "\n";
+				// for (auto x : h_11_cosx) {
+				// 	std::cerr << x << ", ";
+				// }
+				// std::cerr << "\n";
 
 				h1 = phase_detect(h_11_cosx);
 
-				for (auto x : h_21_cosx) {
-					std::cerr << x << ", ";
-				}
-				std::cerr << "\n";
+				// for (auto x : h_21_cosx) {
+				// 	std::cerr << x << ", ";
+				// }
+				// std::cerr << "\n";
 
 				h2 = phase_detect(h_21_cosx);
+				// ! refer to PHY_Sender for value
 				start += 50;
 				state = PhyRecvState::GET_LENGTH;
 			} else if (state == PhyRecvState::GET_LENGTH) {
@@ -335,18 +336,18 @@ private:
 	{
 		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
 			+ config.get_phy_frame_CP_length();
-		int rightmost_pos = m_recv_buffer.size() - step + 1;
+		int rightmost_pos = m_Rx1_buffer.size() - step + 1;
 		int collected_count = 0;
 
 		// std::cerr << "Dump:\n";
 		// for (int i = start - 10 * step; i < start + 10 * step; ++i) {
-		// 	std::cerr << m_recv_buffer[i] << ", ";
+		// 	std::cerr << m_Rx1_buffer[i] << ", ";
 		// }
 		// std::cerr << "\n";
 
 		for (int i = start; i < rightmost_pos && collected_count < count; i += step) {
 			for (int j = 0; j < config.get_symbol_length(); ++j) {
-				samples.push_back(m_recv_buffer[i + config.get_phy_frame_CP_length() + j]);
+				samples.push_back(m_Rx1_buffer[i + config.get_phy_frame_CP_length() + j]);
 			}
 			start += step;
 			if (++collected_count >= count)
@@ -378,9 +379,8 @@ private:
 
 	int to_bits(int count, Bits& bits)
 	{
-		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
-			+ config.get_phy_frame_CP_length();
-		int rightmost_pos = m_recv_buffer.size() - step * 2 + 1;
+		int step = config.get_phy_frame_CP_length() + config.get_symbol_length();
+		int rightmost_pos = m_Rx1_buffer.size() - step * 2 + 1;
 		int converted_count = 0;
 
 		for (int i = start; i < rightmost_pos && converted_count < count; i += step * 2, start += step * 2) {
@@ -388,12 +388,12 @@ private:
 
 				Samples y1;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					y1.push_back(m_recv_buffer[i + config.get_phy_frame_CP_length() + j]);
+					y1.push_back(m_Rx1_buffer[i + config.get_phy_frame_CP_length() + j]);
 				}
 
 				Samples y2;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					y2.push_back(m_recv_buffer[i + step + config.get_phy_frame_CP_length() + j]);
+					y2.push_back(m_Rx1_buffer[i + step + config.get_phy_frame_CP_length() + j]);
 				}
 
 				Samples z1 = vec_add(apply_conjugate(y1, h1), apply_conjugate(y2, h2));
@@ -450,9 +450,8 @@ private:
 	Samples apply_conjugate(const Samples& y, CSI h)
 	{
 		Samples ret;
-		int shift = h.shift <= 4 ? h.shift : y.size() - h.shift;
 		for (int i = 0; i < y.size(); ++i) {
-			int j = i + shift;
+			int j = i + h.shift;
 			if (j >= y.size())
 				j -= y.size();
 
@@ -600,7 +599,7 @@ private:
 	};
 
 	Athernet::Config& config;
-	Athernet::RingBuffer<T>& m_recv_buffer;
+	Athernet::RingBuffer<T>& m_Rx1_buffer;
 	Athernet::SyncQueue<Frame>& m_recv_queue;
 	Athernet::SyncQueue<Frame>& m_decoder_queue;
 	std::thread worker;

@@ -232,8 +232,8 @@ void* Project1_main_loop(void*)
 				mat.push_back(std::move(a));
 			}
 
-			double packet_fail_rate = 0.6;
-			int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
+			double packet_fail_rate = 0.9;
+			int packets_to_send = static_cast<int>((num_packets + 10) / packet_fail_rate);
 
 			while (packets_to_send--) {
 				std::vector<int> start;
