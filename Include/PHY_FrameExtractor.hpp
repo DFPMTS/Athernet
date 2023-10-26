@@ -132,22 +132,42 @@ private:
 					}
 				}
 			} else if (state == PhyRecvState::ESTIMATE_CHANNEL) {
-				// bits.clear();
-				// next_state = PhyRecvState::GET_LENGTH;
-				// state = PhyRecvState::COLLECT_BITS;
-				// symbols_to_collect = 2;
-				for (int i = 0; i < config.get_symbol_length() * 2; ++i) {
-					std::cerr << samples[i] << ",";
+				// * y1 = h_11 * cosx - h_21 * cosx
+				Samples y1;
+				// * y2 = h_11 * cosx + h_21 * cosx
+				Samples y2;
+				for (int i = 0; i < config.get_symbol_length(); ++i) {
+					y1.push_back(samples[i]);
+					y2.push_back(samples[config.get_symbol_length() + i]);
+				}
+
+				for (auto x : y1) {
+					std::cerr << x << ", ";
 				}
 				std::cerr << "\n";
+				phase_detect(y1);
+
+				for (auto x : y2) {
+					std::cerr << x << ", ";
+				}
+				std::cerr << "\n";
+				phase_detect(y2);
+
+				// Samples h_11_cosx(config.get_symbol_length());
+				// for (int i = 0; i < config.get_symbol_length(); ++i) {
+				// 	h_11_cosx[i] = (y1[i] + y2[i]) / 2;
+				// }
+
+				// Samples h_21_cosx(config.get_symbol_length());
+				// for (int i = 0; i < config.get_symbol_length(); ++i) {
+				// 	h_21_cosx[i] = (y2[i] - y1[i]) / 2;
+				// }
+
+				// auto [h_11_scale, h_11_shift] = phase_detect(h_11_cosx);
+				// auto [h_21_scale, h_21_shift] = phase_detect(h_21_cosx);
+
 				state = PhyRecvState::GET_LENGTH;
 			} else if (state == PhyRecvState::GET_LENGTH) {
-				std::cerr << "Training sequence:  ";
-				for (auto x : bits) {
-					std::cerr << x;
-				}
-				std::cerr << "\n";
-
 				bits.clear();
 				symbols_to_collect = config.get_phy_frame_length_num_bits();
 				state = PhyRecvState::COLLECT_BITS;
@@ -234,6 +254,72 @@ private:
 			std::cerr << "     Received:      " << received << "\n";
 			std::cerr << "     Bad:           " << received - good << "\n";
 		}
+	}
+
+	std::pair<float, int> phase_detect(Samples signal)
+	{
+		static Samples ref(config.get_carriers(Tag<T>())[0][0]);
+		float auto_signal = 0;
+		float auto_ref = 0;
+		float sum = 0;
+		for (int i = 0; i < signal.size(); ++i) {
+			auto_signal += signal[i] * signal[i];
+			auto_ref += ref[i] * ref[i];
+		}
+		float max_corr = 0;
+
+		int max_offset = 0;
+		for (int offset = 0; offset < 48000 / 6000; ++offset) {
+			float corr = 0;
+			for (int i = 0; i < signal.size(); ++i) {
+				int j = offset + i;
+				if (j >= signal.size())
+					j -= signal.size();
+				corr += signal[j] * ref[i];
+			}
+			if (corr > max_corr) {
+				max_corr = corr;
+				max_offset = offset;
+			}
+		}
+		std::cerr << "Best shift:  " << max_offset << "\n";
+		return std::make_pair(sqrtf(auto_signal / auto_ref), max_offset);
+	}
+
+	std::pair<float, float> phase_detect_useless(Samples signal)
+	{
+		static Samples ref(config.get_carriers(Tag<T>())[0][0]);
+		static Samples axis(config.get_axes(Tag<T>())[0]);
+
+		float auto_signal = 0;
+		float auto_ref = 0;
+		float sum = 0;
+		for (int i = 0; i < signal.size(); ++i) {
+			sum += signal[i] * ref[i];
+			auto_signal += signal[i] * signal[i];
+			auto_ref += ref[i] * ref[i];
+		}
+
+		float scale = sqrtf(auto_ref / auto_signal);
+		float abs_shift = acosf(sum / sqrtf(auto_ref * auto_signal));
+
+		for (int i = 0; i < signal.size(); ++i) {
+			signal[i] *= scale;
+		}
+		sum = 0;
+		auto_signal = 0;
+		for (int i = 0; i < signal.size(); ++i) {
+			sum += axis[i] * (signal[i] - ref[i]);
+			auto_signal += signal[i] * signal[i];
+		}
+		float shift = asinf(sum / sqrtf(auto_ref * auto_signal));
+
+		if (shift < 0) {
+			shift = (shift + (-abs_shift)) / 2;
+		} else {
+			shift = (shift + abs_shift) / 2;
+		}
+		return std::make_pair(scale, shift);
 	}
 
 	int get_samples(int count, Samples& samples)
