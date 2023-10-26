@@ -79,7 +79,7 @@ private:
 template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_packets, int packet_length)
 {
 	auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
-
+	srand(time(0));
 	for (int i = 0; i < num_packets; ++i) {
 		std::vector<int> a;
 		for (int j = 0; j < packet_length; ++j) {
@@ -149,14 +149,28 @@ void* Project1_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer.get());
 
-	random_test(physical_layer.get(), 10, 10);
+	// random_test(physical_layer.get(), 100, 100);
 
 	std::string s;
 	while (true) {
 		std::cin >> s;
 		static int group_flag = 0;
 		group_flag ^= 1;
-		if (s == "r") {
+		if (s == "w") {
+			std::cin.ignore();
+			std::cout << "Please type your message:\n";
+			std::string data_s;
+			std::getline(std::cin, data_s);
+			std::vector<int> a;
+			for (const auto& c : data_s) {
+				int x = c;
+				for (int i = 0; i < 8; ++i, x >>= 1) {
+					a.push_back(x & 1);
+				}
+			}
+			a.push_back(0);
+			physical_layer->send_frame(a);
+		} else if (s == "r") {
 			int num, len;
 			std::cin >> num >> len;
 			random_test(physical_layer.get(), num, len);

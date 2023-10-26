@@ -27,11 +27,10 @@ public:
 
 	void push_frame(const Frame& frame) { m_send_queue.push(frame); }
 	void push_frame(Frame&& frame) { m_send_queue.push(std::move(frame)); }
-	using MI_Signal = std::vector<Signal>;
+	using MI_Signal = std::pair<Signal, Signal>;
 	void send_loop()
 	{
 		state = PhySendState::PROCESS_FRAME;
-		Signal data_signal;
 		Signal signal;
 		std::vector<int> frame;
 		MI_Signal mi_signal;
@@ -44,38 +43,59 @@ public:
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
 				assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
-				Frame length;
+				Frame actual_frame;
 				for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
 					if (frame.size() & (1ULL << i)) {
-						length.push_back(1);
+						actual_frame.push_back(1);
 					} else {
-						length.push_back(0);
+						actual_frame.push_back(0);
 					}
 				}
-				data_signal.clear();
-				modulate_vec(length, data_signal);
 				append_crc8(frame);
-				modulate_vec(frame, data_signal);
-
+				for (auto x : frame)
+					actual_frame.push_back(x);
+				if (actual_frame.size() & 1) {
+					actual_frame.push_back(0);
+				}
+				assert((actual_frame.size() & 1) == 0);
+				std::cerr << "Sent\n";
+				for (auto x : actual_frame)
+					std::cerr << x;
+				std::cerr << "\n";
 				for (int i = 0; i < 2; ++i) {
 					signal.clear();
 					if (i == 0) {
 						append_preamble(signal);
-						modulate_vec_traning({ 0, 0 }, signal);
+						// append_silence(100, signal);
+						modulate_vec_traning({ 0, -1 }, signal);
 					} else {
 						append_silence(config.get_preamble_length(), signal);
-						modulate_vec_traning({ 1, 0 }, signal);
+						// append_silence(100, signal);
+						modulate_vec_traning({ -1, 0 }, signal);
 					}
-					append_vec(data_signal, signal);
+					append_silence(50, signal);
+					for (int j = 0; j < actual_frame.size(); j += 2) {
+						int s1 = actual_frame[j];
+						int s2 = actual_frame[j + 1];
+						if (i == 0) {
+							modulate_vec_traning({ s1, s2 ^ 1 }, signal);
+						} else {
+							modulate_vec_traning({ s2, s1 }, signal);
+						}
+					}
 					append_silence(200, signal);
-					mi_signal.push_back(std::move(signal));
+					if (i == 0) {
+						mi_signal.first = std::move(signal);
+					} else {
+						mi_signal.second = std::move(signal);
+					}
 				}
 				tx1_sent = 0;
 				tx2_sent = 0;
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {
 				if (!tx1_sent) {
-					if (!m_Tx1_buffer.push(mi_signal[0])) {
+					if (!m_Tx1_buffer.push(mi_signal.first)) {
 						std::this_thread::yield();
 						continue;
 					} else {
@@ -83,7 +103,7 @@ public:
 					}
 				}
 				if (!tx2_sent) {
-					if (!m_Tx2_buffer.push(mi_signal[1])) {
+					if (!m_Tx2_buffer.push(mi_signal.second)) {
 						std::this_thread::yield();
 						continue;
 					} else {
@@ -117,10 +137,11 @@ private:
 			Signal this_piece(config.get_phy_frame_CP_length() + config.get_symbol_length()
 				+ config.get_phy_frame_CP_length());
 			for (int j = 0; j < config.get_num_carriers(); ++j) {
-				if ((i + j < frame.size()) ? frame[i + j] : 0) {
-					add_carrier(j, 1, this_piece);
-				} else {
+				int s = (i + j < frame.size()) ? frame[i + j] : -1;
+				if (s == 0) {
 					add_carrier(j, 0, this_piece);
+				} else if (s == 1) {
+					add_carrier(j, 1, this_piece);
 				}
 			}
 			add_CyclicPrefix(this_piece);

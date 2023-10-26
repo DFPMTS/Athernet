@@ -43,16 +43,16 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 1500;
+		bit_rate = 1200;
 
 		// * Sample Rate
 		sample_rate = 48'000;
 		// Preamble
 		{
 			// * Preamble (chirp) Parameters
-			preamble_f1 = 6'000;
-			preamble_f2 = 12'000;
-			preamble_length = 200;
+			preamble_f1 = 3'000;
+			preamble_f2 = 6'000;
+			preamble_length = 300;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -75,7 +75,7 @@ public:
 			}
 			for (int i = preamble_length / 2; i < preamble_length; ++i) {
 				auto t = linspace[i];
-				preamble.push_back(static_cast<float>(sin(2 * PI
+				preamble.push_back(static_cast<float>(cos(2 * PI
 					* ((preamble_f1 - preamble_f2) * (t * t / T) + (2 * preamble_f2 - preamble_f1) * t
 						+ (preamble_f1 - preamble_f2) * T / 2))));
 			}
@@ -118,7 +118,7 @@ public:
 				carriers_int.push_back({ carrier_0_int, carrier_1_int });
 			}
 
-			phy_frame_CP_length = samples_per_bit >> 2;
+			phy_frame_CP_length = samples_per_bit >> 1;
 		}
 
 		{

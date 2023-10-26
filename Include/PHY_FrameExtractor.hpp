@@ -40,6 +40,11 @@ private:
 
 	int LEN = 0;
 
+	struct CSI {
+		float scale;
+		int shift;
+	};
+
 	void frame_extract_loop()
 	{
 		T max_val = 0;
@@ -80,7 +85,7 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_large_small(dot_product_square, 4, Tag<T>()),
+					if (greater_than(mul_large_small(dot_product_square, 6, Tag<T>()),
 							preamble_received_energy_product, Tag<T>())) {
 						if (dot_product_square > max_val) {
 							max_val = dot_product_square;
@@ -151,20 +156,23 @@ private:
 					h_21_cosx[i] = (y2[i] - y1[i]) / 2;
 				}
 
+				h_11_cosx = y1;
+				h_21_cosx = y2;
+
 				for (auto x : h_11_cosx) {
 					std::cerr << x << ", ";
 				}
 				std::cerr << "\n";
 
-				auto [h_11_scale, h_11_shift] = phase_detect(h_11_cosx);
+				h1 = phase_detect(h_11_cosx);
 
 				for (auto x : h_21_cosx) {
 					std::cerr << x << ", ";
 				}
 				std::cerr << "\n";
 
-				auto [h_21_scale, h_21_shift] = phase_detect(h_21_cosx);
-
+				h2 = phase_detect(h_21_cosx);
+				start += 50;
 				state = PhyRecvState::GET_LENGTH;
 			} else if (state == PhyRecvState::GET_LENGTH) {
 				std::cerr << "start:  " << start << "\n";
@@ -190,8 +198,8 @@ private:
 					// restore start
 					start = saved_start;
 					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					std::cerr << "                                    ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
@@ -201,6 +209,7 @@ private:
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::CHECK_PAYLOAD;
 			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
+				std::cerr << "Begin checking\n";
 				if (crc_check(bits)) {
 					// good to go
 					for (int i = 0; i < config.get_crc_residual_length(); ++i) {
@@ -219,8 +228,8 @@ private:
 
 				} else {
 					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					std::cerr << "                                    ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 
@@ -256,7 +265,7 @@ private:
 		}
 	}
 
-	std::pair<float, int> phase_detect(Samples signal)
+	CSI phase_detect(Samples signal)
 	{
 		static Samples ref(config.get_carriers(Tag<T>())[0][0]);
 		float auto_signal = 0;
@@ -283,7 +292,7 @@ private:
 			}
 		}
 		std::cerr << "Best shift:  " << max_offset << "\n";
-		return std::make_pair(sqrtf(auto_signal / auto_ref), max_offset);
+		return CSI { sqrtf(auto_signal / auto_ref), max_offset };
 	}
 
 	std::pair<float, float> phase_detect_useless(Samples signal)
@@ -324,11 +333,16 @@ private:
 
 	int get_samples(int count, Samples& samples)
 	{
-		int rightmost_pos = m_recv_buffer.size() - config.get_phy_frame_CP_length()
-			- config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
-		int collected_count = 0;
 		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
 			+ config.get_phy_frame_CP_length();
+		int rightmost_pos = m_recv_buffer.size() - step + 1;
+		int collected_count = 0;
+
+		// std::cerr << "Dump:\n";
+		// for (int i = start - 10 * step; i < start + 10 * step; ++i) {
+		// 	std::cerr << m_recv_buffer[i] << ", ";
+		// }
+		// std::cerr << "\n";
 
 		for (int i = start; i < rightmost_pos && collected_count < count; i += step) {
 			for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -364,29 +378,87 @@ private:
 
 	int to_bits(int count, Bits& bits)
 	{
-		int rightmost_pos
-			= m_recv_buffer.size() - config.get_symbol_length() - config.get_phy_frame_CP_length() + 1;
+		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
+			+ config.get_phy_frame_CP_length();
+		int rightmost_pos = m_recv_buffer.size() - step * 2 + 1;
 		int converted_count = 0;
-		int step = config.get_phy_frame_CP_length() + config.get_symbol_length();
 
-		for (int i = start; i < rightmost_pos && converted_count < count; i += step, start += step) {
+		for (int i = start; i < rightmost_pos && converted_count < count; i += step * 2, start += step * 2) {
 			for (const auto& carrier : config.get_carriers(Tag<T>())) {
+
+				Samples y1;
+				for (int j = 0; j < config.get_symbol_length(); ++j) {
+					y1.push_back(m_recv_buffer[i + config.get_phy_frame_CP_length() + j]);
+				}
+
+				Samples y2;
+				for (int j = 0; j < config.get_symbol_length(); ++j) {
+					y2.push_back(m_recv_buffer[i + step + config.get_phy_frame_CP_length() + j]);
+				}
+
+				Samples z1 = vec_add(apply_conjugate(y1, h1), apply_conjugate(y2, h2));
+				Samples z2 = vec_sub(apply_conjugate(y1, h2), apply_conjugate(y2, h1));
+
+				int s1 = -1, s2 = -1;
 				T dot_product = 0;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					dot_product += mul_small(
-						m_recv_buffer[i + config.get_phy_frame_CP_length() + j], carrier[0][j], Tag<T>());
+					dot_product += z1[j] * carrier[0][j];
 				}
-				if (dot_product > 0) {
-					bits.push_back(0);
-				} else {
-					bits.push_back(1);
+				s1 = (dot_product < 0);
+				bits.push_back(s1);
+
+				dot_product = 0;
+				for (int j = 0; j < config.get_symbol_length(); ++j) {
+					dot_product += z2[j] * carrier[0][j];
 				}
-				if (++converted_count >= count)
+				s2 = (dot_product < 0);
+				bits.push_back(s2);
+
+				if ((converted_count += 2) >= count) {
+					if (converted_count > count) {
+						bits.pop_back();
+						--converted_count;
+					}
 					break;
+				}
 			}
 		}
 
 		return converted_count;
+	}
+
+	Samples vec_add(const Samples& x, const Samples& y)
+	{
+		assert(x.size() == y.size());
+		Samples ret;
+		for (int i = 0; i < x.size(); ++i) {
+			ret.push_back(x[i] + y[i]);
+		}
+		return ret;
+	}
+
+	Samples vec_sub(const Samples& x, const Samples& y)
+	{
+		assert(x.size() == y.size());
+		Samples ret;
+		for (int i = 0; i < x.size(); ++i) {
+			ret.push_back(x[i] - y[i]);
+		}
+		return ret;
+	}
+
+	Samples apply_conjugate(const Samples& y, CSI h)
+	{
+		Samples ret;
+		int shift = h.shift <= 4 ? h.shift : y.size() - h.shift;
+		for (int i = 0; i < y.size(); ++i) {
+			int j = i + shift;
+			if (j >= y.size())
+				j -= y.size();
+
+			ret.push_back(h.scale * y[j]);
+		}
+		return ret;
 	}
 
 	int mul_small(int x, int y)
@@ -534,6 +606,7 @@ private:
 	std::thread worker;
 	std::atomic_bool running;
 	int start;
+	CSI h1, h2;
 	PhyRecvState state = PhyRecvState::WAIT_HEADER;
 };
 }

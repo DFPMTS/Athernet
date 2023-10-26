@@ -59,6 +59,7 @@ public:
 				std::this_thread::yield();
 				continue;
 			}
+			std::cerr << frame.size() << "\n";
 			if (frame.size() > 200) {
 				int file_len = 0;
 				for (int i = 0; i < 16; ++i) {
