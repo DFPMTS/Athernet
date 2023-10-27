@@ -25,7 +25,7 @@
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
@@ -324,9 +324,14 @@ void* Project1_main_loop(void*)
 
 	std::vector<int> code;
 	std::vector<int> frame;
-	while (physical_layer->m_receiver.m_decoder_queue.pop(frame)) {
-		for (auto x : frame)
-			code.push_back(x);
+	while (true) {
+		if (physical_layer->m_receiver.m_decoder_queue.pop(frame)) {
+			for (auto x : frame)
+				code.push_back(x);
+		}
+		if (code.size() >= 20460) {
+			break;
+		}
 	}
 
 	int file_id = 12345;
