@@ -121,7 +121,7 @@ private:
 					}
 					normed_corr = pow((2 * (corr / window_sum)), 5);
 
-					if (corr > 0.02) {
+					if (corr > 0.05) {
 						if (corr > max_val) {
 							max_val = corr;
 							max_pos = i;
