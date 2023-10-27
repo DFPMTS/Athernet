@@ -50,8 +50,8 @@ public:
 		// Preamble
 		{
 			// * Preamble (chirp) Parameters
-			preamble_f1 = 6'000;
-			preamble_f2 = 22'000;
+			preamble_f1 = 4'000;
+			preamble_f2 = 16'000;
 			preamble_length = 1000;
 			// * -------------------
 
@@ -95,7 +95,7 @@ public:
 			for (int start_f = min_f, end_f = min_f + band_width; end_f <= max_f;
 				 start_f += band_width, end_f += band_width) {
 				carriers.push_back(
-					{ chirp(start_f, (start_f + end_f) / 2, 500), chirp((start_f + end_f) / 2, end_f, 500) });
+					{ chirp(start_f, (start_f + end_f) / 2, 600), chirp((start_f + end_f) / 2, end_f, 600) });
 			}
 		}
 
