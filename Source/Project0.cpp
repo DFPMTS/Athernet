@@ -1,4 +1,5 @@
 #include "JuceHeader.h"
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <deque>
