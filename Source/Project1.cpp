@@ -329,7 +329,6 @@ void* Project1_main_loop(void*)
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 {
-	// srand(time(0));
 	// std::string file = "INPUT.txt";
 	// file = NOTEBOOK_DIR + file;
 	// auto fd = freopen(file.c_str(), "w", stdout);
