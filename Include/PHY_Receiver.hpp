@@ -16,7 +16,7 @@ template <typename T> class PHY_Receiver {
 public:
 	PHY_Receiver()
 		: config { Athernet::Config::get_instance() }
-		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue)
+		, frame_extractor(m_Rx1_buffer, m_Rx2_buffer, m_recv_queue, m_decoder_queue)
 	{
 		display_running.store(true);
 		display_worker = std::thread(&PHY_Receiver::display_frame, this);
@@ -33,15 +33,30 @@ public:
 		decoder_worker.join();
 	}
 
-	void push_stream(const float* buffer, int count)
+	void Rx1_push_stream(const float* buffer, int count)
 	{
 		bool result = true;
 		for (int i = 0; i < count; ++i) {
 			if constexpr (std::is_floating_point<T>::value) {
-				result = result && m_recv_buffer.push(buffer[i]);
+				result = result && m_Rx1_buffer.push(buffer[i]);
 			} else {
-				result = result
-					&& m_recv_buffer.push(static_cast<T>(buffer[i] * Athernet::RECV_FLOAT_INT_SCALE));
+				result
+					= result && m_Rx1_buffer.push(static_cast<T>(buffer[i] * Athernet::RECV_FLOAT_INT_SCALE));
+			}
+		}
+		// ! May change to busy waiting
+		assert(result);
+	}
+
+	void Rx2_push_stream(const float* buffer, int count)
+	{
+		bool result = true;
+		for (int i = 0; i < count; ++i) {
+			if constexpr (std::is_floating_point<T>::value) {
+				result = result && m_Rx2_buffer.push(buffer[i]);
+			} else {
+				result
+					= result && m_Rx2_buffer.push(static_cast<T>(buffer[i] * Athernet::RECV_FLOAT_INT_SCALE));
 			}
 		}
 		// ! May change to busy waiting
@@ -214,7 +229,8 @@ public:
 
 private:
 	Athernet::Config& config;
-	Athernet::RingBuffer<T> m_recv_buffer;
+	Athernet::RingBuffer<T> m_Rx1_buffer;
+	Athernet::RingBuffer<T> m_Rx2_buffer;
 	Athernet::FrameExtractor<T> frame_extractor;
 	Athernet::SyncQueue<Frame> m_recv_queue;
 	Athernet::SyncQueue<Frame> m_decoder_queue;

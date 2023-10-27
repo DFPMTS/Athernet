@@ -13,10 +13,11 @@ template <typename T> class FrameExtractor {
 	using Frame = std::vector<int>;
 
 public:
-	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue,
-		Athernet::SyncQueue<Frame>& decoder_queue)
+	FrameExtractor(Athernet::RingBuffer<T>& Rx1_buffer, Athernet::RingBuffer<T>& Rx2_buffer,
+		Athernet::SyncQueue<Frame>& recv_queue, Athernet::SyncQueue<Frame>& decoder_queue)
 		: config { Athernet::Config::get_instance() }
-		, m_Rx1_buffer { recv_buffer }
+		, m_Rx1_buffer { Rx1_buffer }
+		, m_Rx2_buffer { Rx2_buffer }
 		, m_recv_queue { recv_queue }
 		, m_decoder_queue { decoder_queue }
 	{
@@ -54,7 +55,8 @@ private:
 		PhyRecvState next_state = PhyRecvState::INVALID_STATE;
 		Bits length;
 		Bits bits;
-		Samples samples;
+		Samples Rx1_samples;
+		Samples Rx2_samples;
 		int received = 0;
 		int good = 0;
 		while (running.load()) {
@@ -115,13 +117,16 @@ private:
 				if (confirmed) {
 					received++;
 					m_Rx1_buffer.discard(max_pos + config.get_preamble_length());
+					// ! only use Rx1 for synchronizing
+					m_Rx2_buffer.discard(max_pos + config.get_preamble_length());
 					std::cerr << "head>  " << m_Rx1_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
 					max_val = 0;
 
-					samples.clear();
+					Rx1_samples.clear();
+					Rx2_samples.clear();
 					symbols_to_collect = 2;
 					state = PhyRecvState::COLLECT_SAMPLES;
 					next_state = PhyRecvState::ESTIMATE_CHANNEL;
@@ -129,49 +134,59 @@ private:
 					if (max_pos != -1) {
 						// discard everything until max_pos
 						m_Rx1_buffer.discard(max_pos);
+						m_Rx2_buffer.discard(max_pos);
 						max_pos = 0;
 						start -= max_pos;
 					} else {
 						m_Rx1_buffer.discard(start);
+						m_Rx2_buffer.discard(start);
 						start = 0;
 					}
 				}
 			} else if (state == PhyRecvState::ESTIMATE_CHANNEL) {
-				// * y1 = h_11 * cosx - h_21 * cosx
-				Samples y1;
-				// * y2 = h_11 * cosx + h_21 * cosx
-				Samples y2;
+				Samples h11_cosx;
+				Samples h21_cosx;
 				for (int i = 0; i < config.get_symbol_length(); ++i) {
-					y1.push_back(samples[i]);
-					y2.push_back(samples[config.get_symbol_length() + i]);
+					h11_cosx.push_back(Rx1_samples[i]);
+					h21_cosx.push_back(Rx1_samples[config.get_symbol_length() + i]);
 				}
 
-				Samples h_11_cosx(config.get_symbol_length());
+				Samples h12_cosx;
+				Samples h22_cosx;
 				for (int i = 0; i < config.get_symbol_length(); ++i) {
-					h_11_cosx[i] = (y1[i] + y2[i]) / 2;
+					h12_cosx.push_back(Rx2_samples[i]);
+					h22_cosx.push_back(Rx2_samples[config.get_symbol_length() + i]);
 				}
 
-				Samples h_21_cosx(config.get_symbol_length());
-				for (int i = 0; i < config.get_symbol_length(); ++i) {
-					h_21_cosx[i] = (y2[i] - y1[i]) / 2;
-				}
+				// Samples h_11_cosx(config.get_symbol_length());
+				// for (int i = 0; i < config.get_symbol_length(); ++i) {
+				// 	h_11_cosx[i] = (y1[i] + y2[i]) / 2;
+				// }
 
-				h_11_cosx = y1;
-				h_21_cosx = y2;
+				// Samples h_21_cosx(config.get_symbol_length());
+				// for (int i = 0; i < config.get_symbol_length(); ++i) {
+				// 	h_21_cosx[i] = (y2[i] - y1[i]) / 2;
+				// }
+
+				// h_11_cosx = y1;
+				// h_21_cosx = y2;
 
 				// for (auto x : h_11_cosx) {
 				// 	std::cerr << x << ", ";
 				// }
 				// std::cerr << "\n";
-
-				h1 = phase_detect(h_11_cosx);
+				std::cerr << "Rx1\n";
+				h11 = phase_detect(h11_cosx);
+				h21 = phase_detect(h21_cosx);
+				std::cerr << "Rx2\n";
+				h12 = phase_detect(h12_cosx);
+				h22 = phase_detect(h22_cosx);
 
 				// for (auto x : h_21_cosx) {
 				// 	std::cerr << x << ", ";
 				// }
 				// std::cerr << "\n";
 
-				h2 = phase_detect(h_21_cosx);
 				// ! refer to PHY_Sender for value
 				start += 50;
 				state = PhyRecvState::GET_LENGTH;
@@ -239,7 +254,7 @@ private:
 				if (!symbols_to_collect) {
 					state = next_state;
 				} else {
-					symbols_to_collect -= get_samples(symbols_to_collect, samples);
+					symbols_to_collect -= get_samples(symbols_to_collect, Rx1_samples, Rx2_samples);
 					if (symbols_to_collect) {
 						std::this_thread::yield();
 					}
@@ -332,11 +347,11 @@ private:
 		return std::make_pair(scale, shift);
 	}
 
-	int get_samples(int count, Samples& samples)
+	int get_samples(int count, Samples& Rx1_samples, Samples& Rx2_samples)
 	{
 		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
 			+ config.get_phy_frame_CP_length();
-		int rightmost_pos = m_Rx1_buffer.size() - step + 1;
+		int rightmost_pos = std::min(m_Rx1_buffer.size(), m_Rx2_buffer.size()) - step + 1;
 		int collected_count = 0;
 
 		// std::cerr << "Dump:\n";
@@ -347,7 +362,8 @@ private:
 
 		for (int i = start; i < rightmost_pos && collected_count < count; i += step) {
 			for (int j = 0; j < config.get_symbol_length(); ++j) {
-				samples.push_back(m_Rx1_buffer[i + config.get_phy_frame_CP_length() + j]);
+				Rx1_samples.push_back(m_Rx1_buffer[i + config.get_phy_frame_CP_length() + j]);
+				Rx2_samples.push_back(m_Rx2_buffer[i + config.get_phy_frame_CP_length() + j]);
 			}
 			start += step;
 			if (++collected_count >= count)
@@ -396,8 +412,8 @@ private:
 					y2.push_back(m_Rx1_buffer[i + step + config.get_phy_frame_CP_length() + j]);
 				}
 
-				Samples z1 = vec_add(apply_conjugate(y1, h1), apply_conjugate(y2, h2));
-				Samples z2 = vec_sub(apply_conjugate(y1, h2), apply_conjugate(y2, h1));
+				Samples z1 = vec_add(apply_conjugate(y1, h11), apply_conjugate(y2, h21));
+				Samples z2 = vec_sub(apply_conjugate(y1, h21), apply_conjugate(y2, h11));
 
 				int s1 = -1, s2 = -1;
 				T dot_product = 0;
@@ -600,12 +616,13 @@ private:
 
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_Rx1_buffer;
+	Athernet::RingBuffer<T>& m_Rx2_buffer;
 	Athernet::SyncQueue<Frame>& m_recv_queue;
 	Athernet::SyncQueue<Frame>& m_decoder_queue;
 	std::thread worker;
 	std::atomic_bool running;
 	int start;
-	CSI h1, h2;
+	CSI h11, h21, h12, h22;
 	PhyRecvState state = PhyRecvState::WAIT_HEADER;
 };
 }

@@ -59,7 +59,8 @@ public:
 		// }
 
 		// MISO for now
-		m_receiver.push_stream(inputChannelData[0], numSamples);
+		m_receiver.Rx1_push_stream(inputChannelData[0], numSamples);
+		m_receiver.Rx2_push_stream(inputChannelData[1], numSamples);
 	}
 
 	virtual void audioDeviceStopped() override { }
@@ -104,7 +105,7 @@ void* Project1_main_loop(void*)
 	juce::ScopedJuceInitialiser_GUI init;
 
 	juce::AudioDeviceManager adm;
-	adm.initialiseWithDefaultDevices(1, 2);
+	adm.initialiseWithDefaultDevices(2, 2);
 
 	auto device_setup = adm.getAudioDeviceSetup();
 	device_setup.sampleRate = 48'000;
@@ -149,7 +150,7 @@ void* Project1_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer.get());
 
-	// random_test(physical_layer.get(), 100, 100);
+	random_test(physical_layer.get(), 10, 10);
 
 	std::string s;
 	while (true) {
