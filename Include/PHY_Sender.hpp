@@ -75,10 +75,15 @@ public:
 					for (int j = 0; j < actual_frame.size(); j += 2) {
 						int s1 = actual_frame[j];
 						int s2 = actual_frame[j + 1];
+						// if (i == 0) {
+						// 	modulate_vec({ s1, s2 ^ 1 }, signal);
+						// } else {
+						// 	modulate_vec({ s2, s1 }, signal);
+						// }
 						if (i == 0) {
-							modulate_vec({ s1, s2 ^ 1 }, signal);
+							modulate_vec({ s1 }, signal);
 						} else {
-							modulate_vec({ s2, s1 }, signal);
+							modulate_vec({ s2 }, signal);
 						}
 					}
 					append_silence(200, signal);

@@ -150,7 +150,7 @@ void* Project1_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer.get());
 
-	random_test(physical_layer.get(), 10, 10);
+	random_test(physical_layer.get(), 2, 4);
 
 	std::string s;
 	while (true) {

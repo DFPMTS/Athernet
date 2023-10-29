@@ -5,6 +5,8 @@
 #include <thread>
 #include <vector>
 
+#define PI acos(-1)
+
 namespace Athernet {
 template <typename T> class FrameExtractor {
 	using SoftUInt64 = std::pair<uint32_t, uint32_t>;
@@ -44,6 +46,11 @@ private:
 	struct CSI {
 		float scale;
 		int shift;
+	};
+
+	struct CSI_ZF {
+		float scale;
+		float shift;
 	};
 
 	void frame_extract_loop()
@@ -124,7 +131,8 @@ private:
 					saved_start = 0;
 					max_pos = -1;
 					max_val = 0;
-
+					ZF_compared_to_ML = 0;
+					now_bits = 0;
 					Rx1_samples.clear();
 					Rx2_samples.clear();
 					symbols_to_collect = 2;
@@ -171,21 +179,52 @@ private:
 				// h_11_cosx = y1;
 				// h_21_cosx = y2;
 
-				// for (auto x : h_11_cosx) {
+				// for (auto x : h11_cosx) {
 				// 	std::cerr << x << ", ";
 				// }
 				// std::cerr << "\n";
-				std::cerr << "Rx1\n";
+				// for (auto x : h21_cosx) {
+				// 	std::cerr << x << ", ";
+				// }
+				// std::cerr << "\n";
+
+				std::cerr << "Rx1_ML\n";
 				h11 = phase_detect(h11_cosx);
 				h21 = phase_detect(h21_cosx);
-				std::cerr << "Rx2\n";
+				std::cerr << "Rx2_ML\n";
 				h12 = phase_detect(h12_cosx);
 				h22 = phase_detect(h22_cosx);
 
-				// for (auto x : h_21_cosx) {
-				// 	std::cerr << x << ", ";
-				// }
-				// std::cerr << "\n";
+				h11_ZF = phase_detect_useless(h11_cosx);
+				h21_ZF = phase_detect_useless(h21_cosx);
+				h12_ZF = phase_detect_useless(h12_cosx);
+				h22_ZF = phase_detect_useless(h22_cosx);
+
+				auto lhs_scale = h11_ZF.scale * h22_ZF.scale, rhs_scale = h12_ZF.scale * h21_ZF.scale;
+				auto lhs_shift = h11_ZF.shift + h22_ZF.shift, rhs_shift = h12_ZF.shift + h21_ZF.shift;
+
+				auto lhs_real = lhs_scale * cos(lhs_shift), lhs_im = lhs_scale * sin(lhs_shift);
+
+				auto rhs_real = rhs_scale * cos(rhs_shift), rhs_im = rhs_scale * sin(rhs_shift);
+
+				auto real = lhs_real - rhs_real, im = lhs_im - rhs_im;
+
+				auto shift = atan(im / real);
+				auto scale = sqrt(real * real + im * im);
+
+				std::cerr << "scale: " << scale << "\n";
+				std::cerr << "shift: " << shift << "\n";
+				c11.scale = h11_ZF.scale / scale;
+				c11.shift = (int)((h11_ZF.shift - shift) / (2 * PI) * 8);
+
+				c12.scale = h12_ZF.scale / scale;
+				c12.shift = (int)((h12_ZF.shift - shift) / (2 * PI) * 8);
+
+				c21.scale = h21_ZF.scale / scale;
+				c21.shift = (int)((h21_ZF.shift - shift) / (2 * PI) * 8);
+
+				c22.scale = h22_ZF.scale / scale;
+				c22.shift = (int)((h22_ZF.shift - shift) / (2 * PI) * 8);
 
 				// ! refer to PHY_Sender for value
 				start += 50;
@@ -241,6 +280,8 @@ private:
 						bits.pop_back();
 						m_decoder_queue.push(std::move(bits));
 					}
+					total_ZF_vs_ML += ZF_compared_to_ML;
+					total_bits += now_bits;
 
 				} else {
 					// discard
@@ -278,6 +319,7 @@ private:
 			std::cerr << "--------[FrameExtractor]--------\n";
 			std::cerr << "     Received:      " << received << "\n";
 			std::cerr << "     Bad:           " << received - good << "\n";
+			std::cerr << "     ZF vs ML:      " << total_ZF_vs_ML << " / " << total_bits << "\n";
 		}
 	}
 
@@ -311,7 +353,7 @@ private:
 		return CSI { sqrtf(auto_signal / auto_ref), max_offset };
 	}
 
-	std::pair<float, float> phase_detect_useless(Samples signal)
+	CSI_ZF phase_detect_useless(Samples signal)
 	{
 		static Samples ref(config.get_carriers(Tag<T>())[0][0]);
 		static Samples axis(config.get_axes(Tag<T>())[0]);
@@ -344,7 +386,7 @@ private:
 		} else {
 			shift = (shift + abs_shift) / 2;
 		}
-		return std::make_pair(scale, shift);
+		return CSI_ZF { 1 / scale, shift };
 	}
 
 	int get_samples(int count, Samples& Rx1_samples, Samples& Rx2_samples)
@@ -396,10 +438,10 @@ private:
 	int to_bits(int count, Bits& bits)
 	{
 		int step = config.get_phy_frame_CP_length() + config.get_symbol_length();
-		int rightmost_pos = m_Rx1_buffer.size() - step * 2 + 1;
+		int rightmost_pos = m_Rx1_buffer.size() - step + 1;
 		int converted_count = 0;
 
-		for (int i = start; i < rightmost_pos && converted_count < count; i += step * 2, start += step * 2) {
+		for (int i = start; i < rightmost_pos && converted_count < count; i += step, start += step) {
 			for (const auto& carrier : config.get_carriers(Tag<T>())) {
 
 				Samples y1;
@@ -409,11 +451,58 @@ private:
 
 				Samples y2;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					y2.push_back(m_Rx1_buffer[i + step + config.get_phy_frame_CP_length() + j]);
+					y2.push_back(m_Rx2_buffer[i + config.get_phy_frame_CP_length() + j]);
 				}
 
-				Samples z1 = vec_add(apply_conjugate(y1, h11), apply_conjugate(y2, h21));
-				Samples z2 = vec_sub(apply_conjugate(y1, h21), apply_conjugate(y2, h11));
+				float min_dis = 999999;
+				int s1_ml = -1, s2_ml = -1;
+				std::vector<float> saved_y_hat_1, saved_y_hat_2;
+				for (int s1 = 0; s1 <= 1; ++s1)
+					for (int s2 = 0; s2 <= 1; ++s2) {
+						auto x1 = config.get_carriers(Tag<T>())[0][s1];
+						auto x2 = config.get_carriers(Tag<T>())[0][s2];
+
+						auto y_hat_1 = vec_add(apply(x1, h11), apply(x2, h21));
+						auto y_hat_2 = vec_add(apply(x1, h12), apply(x2, h22));
+						float dist = 0;
+						for (int i = 0; i < y1.size(); ++i) {
+							dist += (y_hat_1[i] - y1[i]) * (y_hat_1[i] - y1[i]);
+							dist += (y_hat_2[i] - y2[i]) * (y_hat_2[i] - y2[i]);
+						}
+						if (dist <= min_dis) {
+							min_dis = dist;
+							s1_ml = s1;
+							s2_ml = s2;
+							saved_y_hat_1 = y_hat_1;
+							saved_y_hat_2 = y_hat_2;
+						}
+					}
+				// std::cerr
+				// 	<< "-------------------------------------------------------------------------------"
+				// 	   "-------------------------------------------------------------------------------\n";
+				// std::cerr << "Y_hat_1\n";
+				// for (auto x : saved_y_hat_1)
+				// 	std::cerr << x << ", ";
+				// std::cerr << "\n";
+				// std::cerr << "Y1\n";
+				// for (auto x : y1)
+				// 	std::cerr << x << ", ";
+				// std::cerr << "\n";
+
+				// std::cerr << "Y_hat_2\n";
+				// for (auto x : saved_y_hat_2)
+				// 	std::cerr << x << ", ";
+				// std::cerr << "\n";
+				// std::cerr << "Y2\n";
+				// for (auto x : y2)
+				// 	std::cerr << x << ", ";
+				// std::cerr << "\n";
+
+				// std::cerr
+				// 	<< "-------------------------------------------------------------------------------"
+				// 	   "-------------------------------------------------------------------------------\n";
+				Samples z1 = vec_sub(apply(y1, c22), apply(y2, c21));
+				Samples z2 = vec_sub(apply(y2, c11), apply(y1, c12));
 
 				int s1 = -1, s2 = -1;
 				T dot_product = 0;
@@ -421,14 +510,34 @@ private:
 					dot_product += z1[j] * carrier[0][j];
 				}
 				s1 = (dot_product < 0);
-				bits.push_back(s1);
+				bits.push_back(s1_ml);
+				++now_bits;
+				if (s1 != s1_ml)
+					++ZF_compared_to_ML;
+				// std::cerr << "Z1: \n";
+				// std::cerr << "----------\nML: " << s1_ml << "\n";
+				// std::cerr << "ZF: " << s1 << " dot:" << dot_product << "\n";
+				// for (auto x : z1)
+				// 	std::cerr << x << ", ";
+				// std::cerr << "\n";
+				// std::cerr << "Result: " << s1 << "\n";
 
 				dot_product = 0;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
 					dot_product += z2[j] * carrier[0][j];
 				}
 				s2 = (dot_product < 0);
-				bits.push_back(s2);
+				bits.push_back(s2_ml);
+				++now_bits;
+				if (s2 != s2_ml)
+					++ZF_compared_to_ML;
+				// std::cerr << "Z2: \n";
+				// std::cerr << "ML: " << s2_ml << "\n";
+				// std::cerr << "ZF: " << s2 << " dot:" << dot_product << "\n";
+				// for (auto x : z2)
+				// 	std::cerr << x << ", ";
+				// std::cerr << "\n";
+				// std::cerr << "Result: " << dot_product << "\n";
 
 				if ((converted_count += 2) >= count) {
 					if (converted_count > count) {
@@ -468,9 +577,25 @@ private:
 		Samples ret;
 		for (int i = 0; i < y.size(); ++i) {
 			int j = i + h.shift;
-			if (j >= y.size())
+			if (j >= static_cast<int>(y.size()))
 				j -= y.size();
+			if (j < 0)
+				j += y.size();
 
+			ret.push_back(h.scale * y[j]);
+		}
+		return ret;
+	}
+
+	Samples apply(const Samples& y, CSI h)
+	{
+		Samples ret;
+		for (int i = 0; i < y.size(); ++i) {
+			int j = i - h.shift;
+			if (j >= static_cast<int>(y.size()))
+				j -= y.size();
+			if (j < 0)
+				j += y.size();
 			ret.push_back(h.scale * y[j]);
 		}
 		return ret;
@@ -623,6 +748,12 @@ private:
 	std::atomic_bool running;
 	int start;
 	CSI h11, h21, h12, h22;
+	CSI_ZF h11_ZF, h21_ZF, h12_ZF, h22_ZF;
+	CSI c11, c21, c12, c22;
+	int ZF_compared_to_ML = 0;
+	int now_bits = 0;
+	int total_ZF_vs_ML = 0;
+	int total_bits = 0;
 	PhyRecvState state = PhyRecvState::WAIT_HEADER;
 };
 }

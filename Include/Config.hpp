@@ -43,7 +43,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 1200;
+		bit_rate = 1000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
