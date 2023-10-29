@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <complex>
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -35,6 +36,8 @@ constexpr int DUMP_RECEIVED = 1;
 class Config {
 	using Carriers = std::vector<std::vector<std::vector<float>>>;
 	using CarriersInt = std::vector<std::vector<std::vector<int>>>;
+	using Phase = std::complex<float>;
+	using Phases = std::vector<std::vector<Phase>>;
 
 public:
 	Config()
@@ -108,6 +111,7 @@ public:
 					axis.push_back(static_cast<float>(sin(2 * PI * carrier_f * i / sample_rate)));
 				}
 				carriers.push_back({ carrier_0, carrier_1 });
+				carrier_phases.push_back({ Phase { 1, 0 }, Phase { -1, 0 } });
 				axes.push_back(axis);
 
 				std::vector<int> carrier_0_int, carrier_1_int;
@@ -181,6 +185,8 @@ public:
 	const Carriers& get_carriers(Tag<float>) const { return carriers; }
 	const CarriersInt& get_carriers(Tag<int>) const { return carriers_int; }
 
+	const Phases& get_carrier_phases() const { return carrier_phases; }
+
 	const std::vector<std::vector<float>>& get_axes(Tag<float>) const { return axes; }
 
 	int get_num_carriers() const { return carriers.size(); }
@@ -211,6 +217,8 @@ private:
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
+
+	Phases carrier_phases;
 
 	std::vector<std::vector<float>> axes;
 	std::vector<std::vector<std::vector<float>>> carriers;

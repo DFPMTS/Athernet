@@ -2,6 +2,7 @@
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <atomic>
+#include <complex>
 #include <thread>
 #include <vector>
 
@@ -13,6 +14,7 @@ template <typename T> class FrameExtractor {
 	using Bits = std::vector<int>;
 	using Samples = std::vector<T>;
 	using Frame = std::vector<int>;
+	using Phase = std::complex<float>;
 
 public:
 	FrameExtractor(Athernet::RingBuffer<T>& Rx1_buffer, Athernet::RingBuffer<T>& Rx2_buffer,
@@ -42,16 +44,6 @@ private:
 	double to_double(SoftUInt64 x) { return (double)((((unsigned long long)x.first) << 32) + x.second); }
 
 	int LEN = 0;
-
-	struct CSI {
-		float scale;
-		int shift;
-	};
-
-	struct CSI_ZF {
-		float scale;
-		float shift;
-	};
 
 	void frame_extract_loop()
 	{
@@ -189,42 +181,42 @@ private:
 				// std::cerr << "\n";
 
 				std::cerr << "Rx1_ML\n";
-				h11 = phase_detect(h11_cosx);
-				h21 = phase_detect(h21_cosx);
+				h11 = phase_detect(h11_cosx, 0);
+				h21 = phase_detect(h21_cosx, 0);
 				std::cerr << "Rx2_ML\n";
-				h12 = phase_detect(h12_cosx);
-				h22 = phase_detect(h22_cosx);
+				h12 = phase_detect(h12_cosx, 0);
+				h22 = phase_detect(h22_cosx, 0);
 
-				h11_ZF = phase_detect_useless(h11_cosx);
-				h21_ZF = phase_detect_useless(h21_cosx);
-				h12_ZF = phase_detect_useless(h12_cosx);
-				h22_ZF = phase_detect_useless(h22_cosx);
+				// h11_ZF = phase_detect_useless(h11_cosx);
+				// h21_ZF = phase_detect_useless(h21_cosx);
+				// h12_ZF = phase_detect_useless(h12_cosx);
+				// h22_ZF = phase_detect_useless(h22_cosx);
 
-				auto lhs_scale = h11_ZF.scale * h22_ZF.scale, rhs_scale = h12_ZF.scale * h21_ZF.scale;
-				auto lhs_shift = h11_ZF.shift + h22_ZF.shift, rhs_shift = h12_ZF.shift + h21_ZF.shift;
+				// auto lhs_scale = h11_ZF.scale * h22_ZF.scale, rhs_scale = h12_ZF.scale * h21_ZF.scale;
+				// auto lhs_shift = h11_ZF.shift + h22_ZF.shift, rhs_shift = h12_ZF.shift + h21_ZF.shift;
 
-				auto lhs_real = lhs_scale * cos(lhs_shift), lhs_im = lhs_scale * sin(lhs_shift);
+				// auto lhs_real = lhs_scale * cos(lhs_shift), lhs_im = lhs_scale * sin(lhs_shift);
 
-				auto rhs_real = rhs_scale * cos(rhs_shift), rhs_im = rhs_scale * sin(rhs_shift);
+				// auto rhs_real = rhs_scale * cos(rhs_shift), rhs_im = rhs_scale * sin(rhs_shift);
 
-				auto real = lhs_real - rhs_real, im = lhs_im - rhs_im;
+				// auto real = lhs_real - rhs_real, im = lhs_im - rhs_im;
 
-				auto shift = atan(im / real);
-				auto scale = sqrt(real * real + im * im);
+				// auto shift = atan(im / real);
+				// auto scale = sqrt(real * real + im * im);
 
-				std::cerr << "scale: " << scale << "\n";
-				std::cerr << "shift: " << shift << "\n";
-				c11.scale = h11_ZF.scale / scale;
-				c11.shift = (int)((h11_ZF.shift - shift) / (2 * PI) * 8);
+				// std::cerr << "scale: " << scale << "\n";
+				// std::cerr << "shift: " << shift << "\n";
+				// c11.scale = h11_ZF.scale / scale;
+				// c11.shift = (int)((h11_ZF.shift - shift) / (2 * PI) * 8);
 
-				c12.scale = h12_ZF.scale / scale;
-				c12.shift = (int)((h12_ZF.shift - shift) / (2 * PI) * 8);
+				// c12.scale = h12_ZF.scale / scale;
+				// c12.shift = (int)((h12_ZF.shift - shift) / (2 * PI) * 8);
 
-				c21.scale = h21_ZF.scale / scale;
-				c21.shift = (int)((h21_ZF.shift - shift) / (2 * PI) * 8);
+				// c21.scale = h21_ZF.scale / scale;
+				// c21.shift = (int)((h21_ZF.shift - shift) / (2 * PI) * 8);
 
-				c22.scale = h22_ZF.scale / scale;
-				c22.shift = (int)((h22_ZF.shift - shift) / (2 * PI) * 8);
+				// c22.scale = h22_ZF.scale / scale;
+				// c22.shift = (int)((h22_ZF.shift - shift) / (2 * PI) * 8);
 
 				// ! refer to PHY_Sender for value
 				start += 50;
@@ -323,70 +315,16 @@ private:
 		}
 	}
 
-	CSI phase_detect(Samples signal)
+	Phase phase_detect(const Samples& signal, int id)
 	{
-		static Samples ref(config.get_carriers(Tag<T>())[0][0]);
-		float auto_signal = 0;
-		float auto_ref = 0;
-		float sum = 0;
+		auto& x = config.get_carriers(Tag<T>())[id][0];
+		auto& y = config.get_axes(Tag<T>())[id];
+		float real = 0, imag = 0;
 		for (int i = 0; i < signal.size(); ++i) {
-			auto_signal += signal[i] * signal[i];
-			auto_ref += ref[i] * ref[i];
+			real += signal[i] * x[i];
+			imag += signal[i] * y[i];
 		}
-		float max_corr = 0;
-
-		int max_offset = 0;
-		for (int offset = 0; offset < 48000 / 6000; ++offset) {
-			float corr = 0;
-			for (int i = 0; i < signal.size(); ++i) {
-				int j = offset + i;
-				if (j >= signal.size())
-					j -= signal.size();
-				corr += signal[j] * ref[i];
-			}
-			if (corr > max_corr) {
-				max_corr = corr;
-				max_offset = offset;
-			}
-		}
-		std::cerr << "Best shift:  " << max_offset << "\n";
-		return CSI { sqrtf(auto_signal / auto_ref), max_offset };
-	}
-
-	CSI_ZF phase_detect_useless(Samples signal)
-	{
-		static Samples ref(config.get_carriers(Tag<T>())[0][0]);
-		static Samples axis(config.get_axes(Tag<T>())[0]);
-
-		float auto_signal = 0;
-		float auto_ref = 0;
-		float sum = 0;
-		for (int i = 0; i < signal.size(); ++i) {
-			sum += signal[i] * ref[i];
-			auto_signal += signal[i] * signal[i];
-			auto_ref += ref[i] * ref[i];
-		}
-
-		float scale = sqrtf(auto_ref / auto_signal);
-		float abs_shift = acosf(sum / sqrtf(auto_ref * auto_signal));
-
-		for (int i = 0; i < signal.size(); ++i) {
-			signal[i] *= scale;
-		}
-		sum = 0;
-		auto_signal = 0;
-		for (int i = 0; i < signal.size(); ++i) {
-			sum += axis[i] * (signal[i] - ref[i]);
-			auto_signal += signal[i] * signal[i];
-		}
-		float shift = asinf(sum / sqrtf(auto_ref * auto_signal));
-
-		if (shift < 0) {
-			shift = (shift + (-abs_shift)) / 2;
-		} else {
-			shift = (shift + abs_shift) / 2;
-		}
-		return CSI_ZF { 1 / scale, shift };
+		return Phase { real / (x.size() / 2), imag / (x.size() / 2) };
 	}
 
 	int get_samples(int count, Samples& Rx1_samples, Samples& Rx2_samples)
@@ -442,7 +380,7 @@ private:
 		int converted_count = 0;
 
 		for (int i = start; i < rightmost_pos && converted_count < count; i += step, start += step) {
-			for (const auto& carrier : config.get_carriers(Tag<T>())) {
+			for (int id = 0; id < config.get_num_carriers(); ++id) {
 
 				Samples y1;
 				for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -454,91 +392,36 @@ private:
 					y2.push_back(m_Rx2_buffer[i + config.get_phy_frame_CP_length() + j]);
 				}
 
+				auto phase_1 = phase_detect(y1, id);
+				auto phase_2 = phase_detect(y2, id);
+				std::cerr << phase_1 << "\n";
+				std::cerr << phase_2 << "\n";
+				std::cerr << "-------------------------------------------\n";
+
 				float min_dis = 999999;
 				int s1_ml = -1, s2_ml = -1;
 				std::vector<float> saved_y_hat_1, saved_y_hat_2;
 				for (int s1 = 0; s1 <= 1; ++s1)
 					for (int s2 = 0; s2 <= 1; ++s2) {
-						auto x1 = config.get_carriers(Tag<T>())[0][s1];
-						auto x2 = config.get_carriers(Tag<T>())[0][s2];
+						auto x1 = config.get_carrier_phases()[id][s1];
+						auto x2 = config.get_carrier_phases()[id][s2];
 
-						auto y_hat_1 = vec_add(apply(x1, h11), apply(x2, h21));
-						auto y_hat_2 = vec_add(apply(x1, h12), apply(x2, h22));
 						float dist = 0;
-						for (int i = 0; i < y1.size(); ++i) {
-							dist += (y_hat_1[i] - y1[i]) * (y_hat_1[i] - y1[i]);
-							dist += (y_hat_2[i] - y2[i]) * (y_hat_2[i] - y2[i]);
-						}
+
+						auto applied_1 = x1 * h11 + x2 * h21;
+						auto applied_2 = x1 * h12 + x2 * h22;
+
+						dist = std::abs(applied_1 - phase_1) * std::abs(applied_1 - phase_1)
+							+ std::abs(applied_2 - phase_2) * std::abs(applied_2 - phase_2);
+
 						if (dist <= min_dis) {
 							min_dis = dist;
 							s1_ml = s1;
 							s2_ml = s2;
-							saved_y_hat_1 = y_hat_1;
-							saved_y_hat_2 = y_hat_2;
 						}
 					}
-				// std::cerr
-				// 	<< "-------------------------------------------------------------------------------"
-				// 	   "-------------------------------------------------------------------------------\n";
-				// std::cerr << "Y_hat_1\n";
-				// for (auto x : saved_y_hat_1)
-				// 	std::cerr << x << ", ";
-				// std::cerr << "\n";
-				// std::cerr << "Y1\n";
-				// for (auto x : y1)
-				// 	std::cerr << x << ", ";
-				// std::cerr << "\n";
-
-				// std::cerr << "Y_hat_2\n";
-				// for (auto x : saved_y_hat_2)
-				// 	std::cerr << x << ", ";
-				// std::cerr << "\n";
-				// std::cerr << "Y2\n";
-				// for (auto x : y2)
-				// 	std::cerr << x << ", ";
-				// std::cerr << "\n";
-
-				// std::cerr
-				// 	<< "-------------------------------------------------------------------------------"
-				// 	   "-------------------------------------------------------------------------------\n";
-				Samples z1 = vec_sub(apply(y1, c22), apply(y2, c21));
-				Samples z2 = vec_sub(apply(y2, c11), apply(y1, c12));
-
-				int s1 = -1, s2 = -1;
-				T dot_product = 0;
-				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					dot_product += z1[j] * carrier[0][j];
-				}
-				s1 = (dot_product < 0);
 				bits.push_back(s1_ml);
-				++now_bits;
-				if (s1 != s1_ml)
-					++ZF_compared_to_ML;
-				// std::cerr << "Z1: \n";
-				// std::cerr << "----------\nML: " << s1_ml << "\n";
-				// std::cerr << "ZF: " << s1 << " dot:" << dot_product << "\n";
-				// for (auto x : z1)
-				// 	std::cerr << x << ", ";
-				// std::cerr << "\n";
-				// std::cerr << "Result: " << s1 << "\n";
-
-				dot_product = 0;
-				for (int j = 0; j < config.get_symbol_length(); ++j) {
-					dot_product += z2[j] * carrier[0][j];
-				}
-				s2 = (dot_product < 0);
 				bits.push_back(s2_ml);
-				++now_bits;
-				if (s2 != s2_ml)
-					++ZF_compared_to_ML;
-				// std::cerr << "Z2: \n";
-				// std::cerr << "ML: " << s2_ml << "\n";
-				// std::cerr << "ZF: " << s2 << " dot:" << dot_product << "\n";
-				// for (auto x : z2)
-				// 	std::cerr << x << ", ";
-				// std::cerr << "\n";
-				// std::cerr << "Result: " << dot_product << "\n";
-
 				if ((converted_count += 2) >= count) {
 					if (converted_count > count) {
 						bits.pop_back();
@@ -568,35 +451,6 @@ private:
 		Samples ret;
 		for (int i = 0; i < x.size(); ++i) {
 			ret.push_back(x[i] - y[i]);
-		}
-		return ret;
-	}
-
-	Samples apply_conjugate(const Samples& y, CSI h)
-	{
-		Samples ret;
-		for (int i = 0; i < y.size(); ++i) {
-			int j = i + h.shift;
-			if (j >= static_cast<int>(y.size()))
-				j -= y.size();
-			if (j < 0)
-				j += y.size();
-
-			ret.push_back(h.scale * y[j]);
-		}
-		return ret;
-	}
-
-	Samples apply(const Samples& y, CSI h)
-	{
-		Samples ret;
-		for (int i = 0; i < y.size(); ++i) {
-			int j = i - h.shift;
-			if (j >= static_cast<int>(y.size()))
-				j -= y.size();
-			if (j < 0)
-				j += y.size();
-			ret.push_back(h.scale * y[j]);
 		}
 		return ret;
 	}
@@ -747,9 +601,7 @@ private:
 	std::thread worker;
 	std::atomic_bool running;
 	int start;
-	CSI h11, h21, h12, h22;
-	CSI_ZF h11_ZF, h21_ZF, h12_ZF, h22_ZF;
-	CSI c11, c21, c12, c22;
+	Phase h11, h21, h12, h22;
 	int ZF_compared_to_ML = 0;
 	int now_bits = 0;
 	int total_ZF_vs_ML = 0;
