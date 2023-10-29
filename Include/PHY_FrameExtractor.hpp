@@ -158,65 +158,14 @@ private:
 					h22_cosx.push_back(Rx2_samples[config.get_symbol_length() + i]);
 				}
 
-				// Samples h_11_cosx(config.get_symbol_length());
-				// for (int i = 0; i < config.get_symbol_length(); ++i) {
-				// 	h_11_cosx[i] = (y1[i] + y2[i]) / 2;
-				// }
-
-				// Samples h_21_cosx(config.get_symbol_length());
-				// for (int i = 0; i < config.get_symbol_length(); ++i) {
-				// 	h_21_cosx[i] = (y2[i] - y1[i]) / 2;
-				// }
-
-				// h_11_cosx = y1;
-				// h_21_cosx = y2;
-
-				// for (auto x : h11_cosx) {
-				// 	std::cerr << x << ", ";
-				// }
-				// std::cerr << "\n";
-				// for (auto x : h21_cosx) {
-				// 	std::cerr << x << ", ";
-				// }
-				// std::cerr << "\n";
-
-				std::cerr << "Rx1_ML\n";
-				h11 = phase_detect(h11_cosx, 0);
-				h21 = phase_detect(h21_cosx, 0);
-				std::cerr << "Rx2_ML\n";
-				h12 = phase_detect(h12_cosx, 0);
-				h22 = phase_detect(h22_cosx, 0);
-
-				// h11_ZF = phase_detect_useless(h11_cosx);
-				// h21_ZF = phase_detect_useless(h21_cosx);
-				// h12_ZF = phase_detect_useless(h12_cosx);
-				// h22_ZF = phase_detect_useless(h22_cosx);
-
-				// auto lhs_scale = h11_ZF.scale * h22_ZF.scale, rhs_scale = h12_ZF.scale * h21_ZF.scale;
-				// auto lhs_shift = h11_ZF.shift + h22_ZF.shift, rhs_shift = h12_ZF.shift + h21_ZF.shift;
-
-				// auto lhs_real = lhs_scale * cos(lhs_shift), lhs_im = lhs_scale * sin(lhs_shift);
-
-				// auto rhs_real = rhs_scale * cos(rhs_shift), rhs_im = rhs_scale * sin(rhs_shift);
-
-				// auto real = lhs_real - rhs_real, im = lhs_im - rhs_im;
-
-				// auto shift = atan(im / real);
-				// auto scale = sqrt(real * real + im * im);
-
-				// std::cerr << "scale: " << scale << "\n";
-				// std::cerr << "shift: " << shift << "\n";
-				// c11.scale = h11_ZF.scale / scale;
-				// c11.shift = (int)((h11_ZF.shift - shift) / (2 * PI) * 8);
-
-				// c12.scale = h12_ZF.scale / scale;
-				// c12.shift = (int)((h12_ZF.shift - shift) / (2 * PI) * 8);
-
-				// c21.scale = h21_ZF.scale / scale;
-				// c21.shift = (int)((h21_ZF.shift - shift) / (2 * PI) * 8);
-
-				// c22.scale = h22_ZF.scale / scale;
-				// c22.shift = (int)((h22_ZF.shift - shift) / (2 * PI) * 8);
+				for (int id = 0; id < config.get_num_carriers(); ++id) {
+					CSI sub;
+					sub.h[0][0] = phase_detect(h11_cosx, id);
+					sub.h[1][0] = phase_detect(h21_cosx, id);
+					sub.h[0][1] = phase_detect(h12_cosx, id);
+					sub.h[1][1] = phase_detect(h22_cosx, id);
+					csi.push_back(sub);
+				}
 
 				// ! refer to PHY_Sender for value
 				start += 50;
@@ -320,6 +269,7 @@ private:
 		auto& x = config.get_carriers(Tag<T>())[id][0];
 		auto& y = config.get_axes(Tag<T>())[id];
 		float real = 0, imag = 0;
+
 		for (int i = 0; i < signal.size(); ++i) {
 			real += signal[i] * x[i];
 			imag += signal[i] * y[i];
@@ -333,12 +283,6 @@ private:
 			+ config.get_phy_frame_CP_length();
 		int rightmost_pos = std::min(m_Rx1_buffer.size(), m_Rx2_buffer.size()) - step + 1;
 		int collected_count = 0;
-
-		// std::cerr << "Dump:\n";
-		// for (int i = start - 10 * step; i < start + 10 * step; ++i) {
-		// 	std::cerr << m_Rx1_buffer[i] << ", ";
-		// }
-		// std::cerr << "\n";
 
 		for (int i = start; i < rightmost_pos && collected_count < count; i += step) {
 			for (int j = 0; j < config.get_symbol_length(); ++j) {
@@ -394,9 +338,6 @@ private:
 
 				auto phase_1 = phase_detect(y1, id);
 				auto phase_2 = phase_detect(y2, id);
-				std::cerr << phase_1 << "\n";
-				std::cerr << phase_2 << "\n";
-				std::cerr << "-------------------------------------------\n";
 
 				float min_dis = 999999;
 				int s1_ml = -1, s2_ml = -1;
@@ -408,8 +349,8 @@ private:
 
 						float dist = 0;
 
-						auto applied_1 = x1 * h11 + x2 * h21;
-						auto applied_2 = x1 * h12 + x2 * h22;
+						auto applied_1 = x1 * csi[id].h[0][0] + x2 * csi[id].h[1][0];
+						auto applied_2 = x1 * csi[id].h[0][1] + x2 * csi[id].h[1][1];
 
 						dist = std::abs(applied_1 - phase_1) * std::abs(applied_1 - phase_1)
 							+ std::abs(applied_2 - phase_2) * std::abs(applied_2 - phase_2);
@@ -593,6 +534,10 @@ private:
 		INVALID_STATE
 	};
 
+	struct CSI {
+		Phase h[2][2];
+	};
+
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_Rx1_buffer;
 	Athernet::RingBuffer<T>& m_Rx2_buffer;
@@ -601,7 +546,7 @@ private:
 	std::thread worker;
 	std::atomic_bool running;
 	int start;
-	Phase h11, h21, h12, h22;
+	std::vector<CSI> csi;
 	int ZF_compared_to_ML = 0;
 	int now_bits = 0;
 	int total_ZF_vs_ML = 0;

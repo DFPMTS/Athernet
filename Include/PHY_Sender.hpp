@@ -54,10 +54,10 @@ public:
 				append_crc8(frame);
 				for (auto x : frame)
 					actual_frame.push_back(x);
-				if (actual_frame.size() & 1) {
+				while (actual_frame.size() % (2 * config.get_num_carriers())) {
 					actual_frame.push_back(0);
 				}
-				assert((actual_frame.size() & 1) == 0);
+				assert((actual_frame.size() % (2 * config.get_num_carriers())) == 0);
 				std::cerr << "Sent\n";
 				for (auto x : actual_frame)
 					std::cerr << x;
@@ -66,26 +66,31 @@ public:
 					signal.clear();
 					if (i == 0) {
 						append_preamble(signal);
-						modulate_vec_training({ 0, -1 }, signal);
+						Frame training;
+						for (int j = 0; j < config.get_num_carriers(); ++j)
+							training.push_back(0);
+						for (int j = 0; j < config.get_num_carriers(); ++j)
+							training.push_back(-1);
+						modulate_vec_training(training, signal);
 					} else {
 						append_silence(config.get_preamble_length(), signal);
-						modulate_vec_training({ -1, 0 }, signal);
+						Frame training;
+						for (int j = 0; j < config.get_num_carriers(); ++j)
+							training.push_back(-1);
+						for (int j = 0; j < config.get_num_carriers(); ++j)
+							training.push_back(0);
+						modulate_vec_training(training, signal);
 					}
 					append_silence(50, signal);
-					for (int j = 0; j < actual_frame.size(); j += 2) {
-						int s1 = actual_frame[j];
-						int s2 = actual_frame[j + 1];
-						// if (i == 0) {
-						// 	modulate_vec({ s1, s2 ^ 1 }, signal);
-						// } else {
-						// 	modulate_vec({ s2, s1 }, signal);
-						// }
-						if (i == 0) {
-							modulate_vec({ s1 }, signal);
-						} else {
-							modulate_vec({ s2 }, signal);
+
+					for (int j = 0; j < actual_frame.size(); j += (2 * config.get_num_carriers())) {
+						Frame symbol;
+						for (int k = i; k < (2 * config.get_num_carriers()); k += 2) {
+							symbol.push_back(actual_frame[j + k]);
 						}
+						modulate_vec(symbol, signal);
 					}
+
 					append_silence(200, signal);
 					if (i == 0) {
 						mi_signal.first = std::move(signal);
