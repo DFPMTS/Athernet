@@ -292,8 +292,6 @@ private:
 		return ret;
 	}
 
-	T mul_small(T x, T y, Tag<float>) { return x * y; }
-
 	SoftUInt64 mul_large(T signed_x, T signed_y, Tag<int>)
 	{
 		static constexpr uint32_t LOW_16_MASK = (1 << 16) - 1;
@@ -339,8 +337,6 @@ private:
 		return std::make_pair(upper, lower);
 	}
 
-	float mul_large(T x, T y, Tag<float>) { return x * y; }
-
 	SoftUInt64 add_large(SoftUInt64 x, SoftUInt64 y, Tag<int>)
 	{
 		auto [x_upper, x_lower] = x;
@@ -357,14 +353,10 @@ private:
 		return std::make_pair(upper, lower);
 	}
 
-	T add_large(T x, T y, Tag<float>) { return x + y; }
-
 	bool greater_than(SoftUInt64 x, SoftUInt64 y, Tag<int>)
 	{
 		return ((x.first > y.first) || ((x.first == y.first) && (x.second >= y.second)));
 	}
-
-	bool greater_than(T x, T y, Tag<float>) { return x > y; }
 
 	SoftUInt64 mul_large_small(SoftUInt64 x, int y, Tag<int>)
 	{
@@ -378,8 +370,6 @@ private:
 		}
 		return ret;
 	}
-
-	float mul_large_small(T x, int y, Tag<float>) { return x * y; }
 
 	enum class PhyRecvState {
 		WAIT_HEADER,

@@ -28,31 +28,6 @@
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 
-class SoundGenerator : public juce::AudioIODeviceCallback {
-public:
-	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override { }
-
-	virtual void audioDeviceIOCallbackWithContext([[maybe_unused]] const float* const* inputChannelData,
-		[[maybe_unused]] int numInputChannels, [[maybe_unused]] float* const* outputChannelData,
-		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
-		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
-	{
-		for (int i = 0; i < numSamples; ++i) {
-			outputChannelData[0][i] = sin(2 * PI * 1000 * (total_samples + i) / sample_rate)
-				+ sin(2 * PI * 10000 * (total_samples + i) / sample_rate);
-		}
-		total_samples += numSamples;
-		if (total_samples >= sample_rate)
-			total_samples -= sample_rate;
-	}
-
-	virtual void audioDeviceStopped() override { }
-
-private:
-	int total_samples = 0;
-	int sample_rate = 48000;
-};
-
 template <typename T> class PHY_layer : public juce::AudioIODeviceCallback {
 public:
 	PHY_layer()
@@ -110,51 +85,6 @@ template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_pac
 		fflush(sent_fd);
 	}
 	fclose(sent_fd);
-}
-
-void* Project1_Task2_loop(void*)
-{
-	// Use RAII pattern to take care of initializing/shutting down JUCE
-	juce::ScopedJuceInitialiser_GUI init;
-
-	juce::AudioDeviceManager adm;
-	adm.initialiseWithDefaultDevices(0, 1);
-
-	auto device_setup = adm.getAudioDeviceSetup();
-	device_setup.sampleRate = 48000;
-	device_setup.bufferSize = 256;
-
-	auto sound_generator = std::make_unique<SoundGenerator>();
-
-	auto device_type = adm.getCurrentDeviceTypeObject();
-	{
-		auto default_input = device_type->getDefaultDeviceIndex(true);
-		auto input_devices = device_type->getDeviceNames(true);
-
-		std::cerr << "-------Input-------\n";
-		for (int i = 0; i < input_devices.size(); ++i)
-			std::cerr << (i == default_input ? "x " : "  ") << input_devices[i] << "\n";
-	}
-
-	{
-		auto default_output = device_type->getDefaultDeviceIndex(false);
-		auto output_devices = device_type->getDeviceNames(false);
-
-		std::cerr << "-------Output------\n";
-		for (int i = 0; i < output_devices.size(); ++i)
-			std::cerr << (i == default_output ? "x " : "  ") << output_devices[i] << "\n";
-		std::cerr << "-------------------\n";
-	}
-	// device_setup.outputDeviceName = "MacBook Pro Speakers";
-	adm.setAudioDeviceSetup(device_setup, false);
-
-	adm.addAudioCallback(sound_generator.get());
-
-	getchar();
-
-	adm.removeAudioCallback(sound_generator.get());
-
-	return NULL;
 }
 
 void* Project1_main_loop(void*)
@@ -244,7 +174,8 @@ void* Project1_main_loop(void*)
 			}
 
 			int num_packets = 100;
-			int packet_len = (int)(text.size() + length.size() - 1) / num_packets + 1;
+			// ! attention: hard coding
+			int packet_len = 101;
 
 			std::random_device seeder;
 			const auto seed = seeder.entropy() ? seeder() : time(nullptr);
@@ -277,8 +208,8 @@ void* Project1_main_loop(void*)
 				mat.push_back(std::move(a));
 			}
 
-			double packet_fail_rate = 0.6;
-			int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
+			// ! attention: hard coding
+			int packets_to_send = 150;
 
 			while (packets_to_send--) {
 				std::vector<int> start;
