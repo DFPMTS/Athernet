@@ -25,7 +25,7 @@
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 #ifndef WIN
 #define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s

@@ -9,7 +9,7 @@
 
 #define PI acos(-1)
 
-#define WIN
+// #define WIN
 
 using namespace std::string_literals;
 
@@ -95,7 +95,7 @@ public:
 			for (int start_f = min_f, end_f = min_f + band_width; end_f <= max_f;
 				 start_f += band_width, end_f += band_width) {
 				carriers.push_back(
-					{ chirp(start_f, (start_f + end_f) / 2, 600), chirp((start_f + end_f) / 2, end_f, 600) });
+					{ chirp(start_f, (start_f + end_f) / 2, 700), chirp((start_f + end_f) / 2, end_f, 700) });
 			}
 		}
 
