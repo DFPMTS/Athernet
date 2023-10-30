@@ -41,6 +41,10 @@ public:
 	};
 
 private:
+	struct CSI {
+		Phase h[2][2];
+	};
+
 	double to_double(SoftUInt64 x) { return (double)((((unsigned long long)x.first) << 32) + x.second); }
 
 	int LEN = 0;
@@ -336,6 +340,46 @@ private:
 		return is_zero;
 	}
 
+	CSI inv(CSI x)
+	{
+		Phase det = x.h[0][0] * x.h[1][1] - x.h[0][1] * x.h[1][0];
+		swap(x.h[0][0], x.h[1][1]);
+		x.h[0][1] = -x.h[0][1];
+		x.h[1][0] = -x.h[1][0];
+		for (int i = 0; i < 2; ++i)
+			for (int j = 0; j < 2; ++j) {
+				x.h[i][j] /= det;
+			}
+		return x;
+	}
+
+	CSI transpose(CSI x)
+	{
+		swap(x.h[0][1], x.h[1][0]);
+		return x;
+	}
+
+	CSI matmul(CSI x, CSI y)
+	{
+		CSI ret;
+		memset(ret.h, 0, sizeof(ret.h));
+		for (int i = 0; i < 2; ++i) {
+			for (int k = 0; k < 2; ++k) {
+				for (int j = 0; j < 2; ++j) {
+					ret.h[i][j] += x.h[i][k] * y.h[k][j];
+				}
+			}
+		}
+		return ret;
+	}
+
+	CSI moore_penrose_inv(CSI x) { return matmul(inv(matmul(transpose(x), x)), transpose(x)); }
+
+	std::vector<Phase> vec_matmul(std::vector<Phase> vec, CSI mat)
+	{
+		return { vec[0] * mat.h[0][0] + vec[1] * mat.h[1][0], vec[0] * mat.h[0][1] + vec[1] * mat.h[1][1] };
+	}
+
 	int to_bits(int count, Bits& bits)
 	{
 		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
@@ -385,8 +429,16 @@ private:
 							saved_2 = applied_2;
 						}
 					}
-				bits.push_back(s1_ml);
-				bits.push_back(s2_ml);
+
+				int s1_zf = -1, s2_zf = -1;
+				auto vec = vec_matmul({ phase_1, phase_2 }, moore_penrose_inv(csi[id]));
+				s1_zf = vec[0].real() < 0;
+				s2_zf = vec[1].real() < 0;
+
+				// bits.push_back(s1_ml);
+				// bits.push_back(s2_ml);
+				bits.push_back(s1_zf);
+				bits.push_back(s2_zf);
 
 				if (dump) {
 					std::cerr << "---------------------------Y1---------------------------\n";
@@ -401,6 +453,9 @@ private:
 					}
 					std::cerr << "\n";
 					std::cerr << phase_2 << "  " << saved_2 << "  -  " << s2_ml << "\n";
+					std::cerr << "---------------------------------\n";
+					std::cerr << s1_ml << "  -  " << s1_zf << "\n";
+					std::cerr << s2_ml << "  -  " << s2_zf << "\n";
 				}
 
 				if ((converted_count += 2) >= count) {
@@ -572,10 +627,6 @@ private:
 		COLLECT_BITS,
 		COLLECT_SAMPLES,
 		INVALID_STATE
-	};
-
-	struct CSI {
-		Phase h[2][2];
 	};
 
 	struct PhaseLog {
