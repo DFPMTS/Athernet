@@ -157,13 +157,18 @@ private:
 					h12_cosx.push_back(Rx2_samples[i]);
 					h22_cosx.push_back(Rx2_samples[config.get_symbol_length() + i]);
 				}
-
+				phase_log.clear();
+				csi.clear();
 				for (int id = 0; id < config.get_num_carriers(); ++id) {
 					CSI sub;
 					sub.h[0][0] = phase_detect(h11_cosx, id);
 					sub.h[1][0] = phase_detect(h21_cosx, id);
 					sub.h[0][1] = phase_detect(h12_cosx, id);
 					sub.h[1][1] = phase_detect(h22_cosx, id);
+					phase_log.push_back(PhaseLog { h11_cosx, sub.h[0][0] });
+					phase_log.push_back(PhaseLog { h21_cosx, sub.h[1][0] });
+					phase_log.push_back(PhaseLog { h12_cosx, sub.h[0][1] });
+					phase_log.push_back(PhaseLog { h22_cosx, sub.h[1][1] });
 					csi.push_back(sub);
 				}
 
@@ -196,6 +201,13 @@ private:
 					// discard
 					std::cerr << "                                    ";
 					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// std::cerr << "Phase log:\n";
+					// for (auto& x : phase_log) {
+					// 	for (auto y : x.signal)
+					// 		std::cerr << y << ", ";
+					// 	std::cerr << "\n";
+					// 	std::cerr << x.estimate << "\n";
+					// }
 					continue;
 				}
 
@@ -228,6 +240,13 @@ private:
 					// discard
 					std::cerr << "                                    ";
 					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// std::cerr << "Phase log:\n";
+					// for (auto& x : phase_log) {
+					// 	for (auto y : x.signal)
+					// 		std::cerr << y << ", ";
+					// 	std::cerr << "\n";
+					// 	std::cerr << x.estimate << "\n";
+					// }
 					start = saved_start;
 				}
 
@@ -319,7 +338,8 @@ private:
 
 	int to_bits(int count, Bits& bits)
 	{
-		int step = config.get_phy_frame_CP_length() + config.get_symbol_length();
+		int step = config.get_phy_frame_CP_length() + config.get_symbol_length()
+			+ config.get_phy_frame_CP_length();
 		int rightmost_pos = m_Rx1_buffer.size() - step + 1;
 		int converted_count = 0;
 
@@ -338,6 +358,8 @@ private:
 
 				auto phase_1 = phase_detect(y1, id);
 				auto phase_2 = phase_detect(y2, id);
+
+				Phase saved_1, saved_2;
 
 				float min_dis = 999999;
 				int s1_ml = -1, s2_ml = -1;
@@ -359,10 +381,28 @@ private:
 							min_dis = dist;
 							s1_ml = s1;
 							s2_ml = s2;
+							saved_1 = applied_1;
+							saved_2 = applied_2;
 						}
 					}
 				bits.push_back(s1_ml);
 				bits.push_back(s2_ml);
+
+				if (dump) {
+					std::cerr << "---------------------------Y1---------------------------\n";
+					for (auto x : y1) {
+						std::cerr << x << ", ";
+					}
+					std::cerr << "\n";
+					std::cerr << phase_1 << "  " << saved_1 << "  -  " << s1_ml << "\n";
+					std::cerr << "---------------------------Y2---------------------------\n";
+					for (auto x : y2) {
+						std::cerr << x << ", ";
+					}
+					std::cerr << "\n";
+					std::cerr << phase_2 << "  " << saved_2 << "  -  " << s2_ml << "\n";
+				}
+
 				if ((converted_count += 2) >= count) {
 					if (converted_count > count) {
 						bits.pop_back();
@@ -538,6 +578,11 @@ private:
 		Phase h[2][2];
 	};
 
+	struct PhaseLog {
+		Samples signal;
+		Phase estimate;
+	};
+
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_Rx1_buffer;
 	Athernet::RingBuffer<T>& m_Rx2_buffer;
@@ -547,10 +592,12 @@ private:
 	std::atomic_bool running;
 	int start;
 	std::vector<CSI> csi;
+	std::vector<PhaseLog> phase_log;
 	int ZF_compared_to_ML = 0;
 	int now_bits = 0;
 	int total_ZF_vs_ML = 0;
 	int total_bits = 0;
+	int dump = 0;
 	PhyRecvState state = PhyRecvState::WAIT_HEADER;
 };
 }

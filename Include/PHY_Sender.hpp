@@ -88,7 +88,7 @@ public:
 						for (int k = i; k < (2 * config.get_num_carriers()); k += 2) {
 							symbol.push_back(actual_frame[j + k]);
 						}
-						modulate_vec(symbol, signal);
+						modulate_vec_training(symbol, signal);
 					}
 
 					append_silence(200, signal);

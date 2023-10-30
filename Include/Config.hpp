@@ -53,8 +53,8 @@ public:
 		// Preamble
 		{
 			// * Preamble (chirp) Parameters
-			preamble_f1 = 3'000;
-			preamble_f2 = 6'000;
+			preamble_f1 = 4'000;
+			preamble_f2 = 8'000;
 			preamble_length = 300;
 			// * -------------------
 
