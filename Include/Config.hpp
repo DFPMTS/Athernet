@@ -78,7 +78,7 @@ public:
 			}
 			for (int i = preamble_length / 2; i < preamble_length; ++i) {
 				auto t = linspace[i];
-				preamble.push_back(static_cast<float>(cos(2 * PI
+				preamble.push_back(static_cast<float>(sin(2 * PI
 					* ((preamble_f1 - preamble_f2) * (t * t / T) + (2 * preamble_f2 - preamble_f1) * t
 						+ (preamble_f1 - preamble_f2) * T / 2))));
 			}
@@ -122,7 +122,7 @@ public:
 				carriers_int.push_back({ carrier_0_int, carrier_1_int });
 			}
 
-			phy_frame_CP_length = samples_per_bit >> 1;
+			phy_frame_CP_length = samples_per_bit / 3;
 		}
 
 		{
