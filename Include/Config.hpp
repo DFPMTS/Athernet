@@ -43,7 +43,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 5000;
+		bit_rate = 3000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -51,8 +51,8 @@ public:
 		{
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 3'000;
-			preamble_f2 = 16'000;
-			preamble_length = 100;
+			preamble_f2 = 15'000;
+			preamble_length = 120;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -75,7 +75,7 @@ public:
 			}
 			for (int i = preamble_length / 2; i < preamble_length; ++i) {
 				auto t = linspace[i];
-				preamble.push_back(static_cast<float>(cos(2 * PI
+				preamble.push_back(static_cast<float>(sin(2 * PI
 					* ((preamble_f1 - preamble_f2) * (t * t / T) + (2 * preamble_f2 - preamble_f1) * t
 						+ (preamble_f1 - preamble_f2) * T / 2))));
 			}
@@ -98,7 +98,7 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			std::vector<int> carrier_frequencies = { 5000, 10000, 15000 };
+			std::vector<int> carrier_frequencies = { 3000, 6000, 9000, 12000, 15000 };
 
 			for (auto carrier_f : carrier_frequencies) {
 				std::vector<float> carrier_0, carrier_1;
@@ -203,7 +203,7 @@ private:
 	int phy_frame_CP_length;
 
 	int phy_frame_payload_symbol_limit = 1000;
-	int phy_frame_length_num_bits = 9;
+	int phy_frame_length_num_bits = 10;
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;

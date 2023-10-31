@@ -99,7 +99,7 @@ void* Project1_main_loop(void*)
 	device_setup.sampleRate = 48'000;
 	device_setup.bufferSize = 256;
 
-	auto physical_layer = std::make_unique<PHY_layer<int>>();
+	auto physical_layer = std::make_unique<PHY_layer<float>>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
