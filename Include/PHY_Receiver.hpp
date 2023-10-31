@@ -59,7 +59,7 @@ public:
 				std::this_thread::yield();
 				continue;
 			}
-			if (frame.size() > 200) {
+			if (frame.size() > 1000) {
 				int file_len = 0;
 				for (int i = 0; i < 16; ++i) {
 					file_len += (frame[i] << i);

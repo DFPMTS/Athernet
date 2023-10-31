@@ -59,7 +59,6 @@ public:
 				modulate_vec(frame, signal);
 
 				append_silence(signal);
-				append_silence(signal);
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {
 				if (!m_send_buffer.push(signal)) {
@@ -147,6 +146,6 @@ private:
 	std::atomic_bool running;
 	Athernet::RingBuffer<T> m_send_buffer;
 	Athernet::Config& config;
-	Signal m_silence = Signal(200);
+	Signal m_silence = Signal(50);
 };
 }

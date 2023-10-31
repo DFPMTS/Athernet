@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-#define WIN
+// #define WIN
 
 using namespace std::string_literals;
 
@@ -43,16 +43,16 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 2000;
+		bit_rate = 5000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
 		// Preamble
 		{
 			// * Preamble (chirp) Parameters
-			preamble_f1 = 6'000;
-			preamble_f2 = 12'000;
-			preamble_length = 200;
+			preamble_f1 = 3'000;
+			preamble_f2 = 16'000;
+			preamble_length = 100;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -98,7 +98,7 @@ public:
 		// Carrier Wave
 		{
 			int samples_per_bit = sample_rate / bit_rate;
-			std::vector<int> carrier_frequencies = { 6000, 10000 };
+			std::vector<int> carrier_frequencies = { 5000, 10000, 15000 };
 
 			for (auto carrier_f : carrier_frequencies) {
 				std::vector<float> carrier_0, carrier_1;
@@ -202,8 +202,8 @@ private:
 
 	int phy_frame_CP_length;
 
-	int phy_frame_payload_symbol_limit = 400;
-	int phy_frame_length_num_bits = 8;
+	int phy_frame_payload_symbol_limit = 1000;
+	int phy_frame_length_num_bits = 9;
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
