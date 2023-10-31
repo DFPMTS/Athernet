@@ -118,8 +118,8 @@ private:
 					if (max_pos != -1) {
 						// discard everything until max_pos
 						m_recv_buffer.discard(max_pos);
-						max_pos = 0;
 						start -= max_pos;
+						max_pos = 0;
 					} else {
 						m_recv_buffer.discard(start);
 						start = 0;
