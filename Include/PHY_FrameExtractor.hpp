@@ -139,8 +139,8 @@ private:
 						// discard everything until max_pos
 						m_Rx1_buffer.discard(max_pos);
 						m_Rx2_buffer.discard(max_pos);
-						max_pos = 0;
 						start -= max_pos;
+						max_pos = 0;
 					} else {
 						m_Rx1_buffer.discard(start);
 						m_Rx2_buffer.discard(start);
