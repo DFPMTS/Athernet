@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-// #define WIN
+#define WIN
 
 using namespace std::string_literals;
 
