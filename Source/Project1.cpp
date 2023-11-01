@@ -17,14 +17,6 @@
 
 #define PI acos(-1)
 
-#define WIN
-
-#ifndef WIN
-#define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
-#else
-#define NOTEBOOK_DIR "D:/fa23/Athernet/Extras/"s
-#endif
-
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 

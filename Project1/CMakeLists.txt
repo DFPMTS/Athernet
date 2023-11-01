@@ -14,6 +14,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../FRUT/prefix/FRUT/cmake")
   set(JUCE_MODULES_GLOBAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../../JUCE/modules")
   set(ASIO_PATH "${CMAKE_CURRENT_LIST_DIR}/../../asiosdk_2.3.3_2019-06-14/common")
+  add_compile_definitions(WIN)
 
 elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
