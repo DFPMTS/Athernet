@@ -6,8 +6,6 @@
 #include <iostream>
 #include <vector>
 
-#define WIN
-
 using namespace std::string_literals;
 
 #ifndef WIN

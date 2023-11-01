@@ -1,8 +1,7 @@
 #include "Config.hpp"
 #include "JuceHeader.h"
-#include "PHY_Receiver.hpp"
-#include "PHY_Sender.hpp"
-#include "RingBuffer.hpp"
+#include "LT_Send.hpp"
+#include "PHY_Layer.hpp"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -11,61 +10,14 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <random>
 #include <string>
 #include <vector>
-
-#define PI acos(-1)
-
-#define WIN
-
-#ifndef WIN
-#define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
-#else
-#define NOTEBOOK_DIR "D:/fa23/Athernet/Extras/"s
-#endif
 
 using namespace std::chrono_literals;
 using namespace std::string_literals;
 
-template <typename T> class PHY_layer : public juce::AudioIODeviceCallback {
-public:
-	PHY_layer()
-		: config { Athernet::Config::get_instance() }
-	{
-	}
-
-	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override { }
-
-	virtual void audioDeviceIOCallbackWithContext([[maybe_unused]] const float* const* inputChannelData,
-		[[maybe_unused]] int numInputChannels, [[maybe_unused]] float* const* outputChannelData,
-		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
-		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
-	{
-		int samples_wrote = m_sender.pop_stream(outputChannelData[0], numSamples);
-
-		for (int i = samples_wrote; i < numSamples; ++i) {
-			outputChannelData[0][i] = 0;
-		}
-
-		m_receiver.push_stream(inputChannelData[0], numSamples);
-	}
-
-	virtual void audioDeviceStopped() override { }
-
-	void send_frame(const std::vector<int>& frame) { m_sender.push_frame(frame); }
-
-	std::vector<std::vector<int>> get_frames() { }
-
-	~PHY_layer() { }
-
-private:
-	Athernet::Config& config;
-	Athernet::PHY_Receiver<T> m_receiver;
-	Athernet::PHY_Sender<T> m_sender;
-};
-
-template <typename T> void random_test(PHY_layer<T>* physical_layer, int num_packets, int packet_length)
+template <typename T>
+void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int packet_length)
 {
 	auto sent_fd = fopen((NOTEBOOK_DIR + "sent.txt"s).c_str(), "wc");
 
@@ -99,7 +51,7 @@ void* Project1_main_loop(void*)
 	device_setup.sampleRate = 48'000;
 	device_setup.bufferSize = 64;
 
-	auto physical_layer = std::make_unique<PHY_layer<float>>();
+	auto physical_layer = std::make_unique<Athernet::PHY_Layer<float>>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -140,110 +92,14 @@ void* Project1_main_loop(void*)
 	std::string s;
 	while (true) {
 		std::cin >> s;
-		static int group_flag = 0;
-		group_flag ^= 1;
 		if (s == "r") {
 			int num, len;
 			std::cin >> num >> len;
 			random_test(physical_layer.get(), num, len);
 		} else if (s == "s") {
 			std::string file;
-			std::vector<int> text;
-			int c;
-
 			std::cin >> file;
-			file = NOTEBOOK_DIR + file;
-			auto fd = fopen(file.c_str(), "r");
-			while ((c = fgetc(fd)) != EOF) {
-				text.push_back(int(c - '0'));
-			}
-			if (fd)
-				fclose(fd);
-
-			int file_len = (int)text.size();
-			std::vector<int> length;
-			for (int i = 0; i < 16; ++i) {
-				if (file_len & (1 << i)) {
-					length.push_back(1);
-				} else {
-					length.push_back(0);
-				}
-			}
-
-			int num_packets = 100;
-			int packet_len = (int)(text.size() + length.size() - 1) / num_packets + 1;
-
-			std::random_device seeder;
-			const auto seed = seeder.entropy() ? seeder() : time(nullptr);
-			std::mt19937 engine { static_cast<std::mt19937::result_type>(seed) };
-			std::uniform_int_distribution<int> window_start_distribution { 0, num_packets - 1 };
-			std::uniform_int_distribution<int> is_one_distribution { 1, 100 };
-
-			std::vector<std::vector<int>> mat;
-			std::vector<int> a;
-
-			for (auto x : length) {
-				a.push_back(x);
-				if (a.size() == packet_len) {
-					mat.push_back(std::move(a));
-					a.clear();
-				}
-			}
-			for (auto x : text) {
-				a.push_back(x);
-				if (a.size() == packet_len) {
-					mat.push_back(std::move(a));
-					a.clear();
-				}
-			}
-
-			if (a.size()) {
-				for (int i = (int)a.size(); i < packet_len; ++i) {
-					a.push_back(0);
-				}
-				mat.push_back(std::move(a));
-			}
-
-			double packet_fail_rate = 0.6;
-			int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
-
-			while (packets_to_send--) {
-				std::vector<int> start;
-				int start_point = window_start_distribution(engine);
-				for (int i = 0; i < 7; ++i) {
-					if (start_point & (1 << i)) {
-						start.push_back(1);
-					} else {
-						start.push_back(0);
-					}
-				}
-				std::vector<int> bit_map(19);
-				std::vector<int> frame = mat[start_point];
-				for (int i = 0; i < 19; ++i) {
-					bit_map[i] = (is_one_distribution(engine) < 60) ? 1 : 0;
-					if (bit_map[i]) {
-						int j = start_point + i + 1;
-						if (j >= 100)
-							j -= 100;
-						for (int k = 0; k < packet_len; ++k) {
-							frame[k] ^= mat[j][k];
-						}
-					}
-				}
-				std::vector<int> actual_frame;
-				for (auto x : start)
-					actual_frame.push_back(x);
-				for (auto x : bit_map)
-					actual_frame.push_back(x);
-				for (auto x : frame)
-					actual_frame.push_back(x);
-
-				actual_frame.push_back(group_flag);
-				actual_frame.push_back(1);
-
-				physical_layer->send_frame(actual_frame);
-			}
-
+			Athernet::LT_Send(physical_layer.get(), file);
 		} else if (s == "e") {
 			break;
 		}
