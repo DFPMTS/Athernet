@@ -1,6 +1,6 @@
 #include "Config.hpp"
 #include "JuceHeader.h"
-#include "LT_Send.hpp"
+#include "LT_Encode.hpp"
 #include "PHY_Layer.hpp"
 #include <algorithm>
 #include <chrono>

@@ -70,7 +70,8 @@ jucer_project_files("Project1/Include"
   .         .         .         "Include/PHY_Receiver.hpp"
   .         .         .         "Include/PHY_FrameExtractor.hpp"
   .         .         .         "Include/PHY_Layer.hpp"
-  .         .         .         "Include/LT_Send.hpp"
+  .         .         .         "Include/LT_Encode.hpp"
+  .         .         .         "Include/LT_Decode.hpp"
 )
 
 # --------------------------------Source----------------------------------- #
