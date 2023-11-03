@@ -82,13 +82,14 @@ public:
 
 	int pop_stream(float* buffer, int count)
 	{
+		static int counter = 0;
 		if (!stall.load()) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);
 				if (!succ)
 					return 0;
 			}
-			if (start == 0 && m_busy.load())
+			if (start == 0 && (m_busy.load() || --counter > 0))
 				return 0;
 			int size = m_send_buffer.size();
 			int index = 0;
@@ -103,6 +104,7 @@ public:
 			return index;
 		} else {
 			start = 0;
+			counter = rand() % 20;
 			return 0;
 		}
 
