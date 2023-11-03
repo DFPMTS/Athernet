@@ -35,7 +35,7 @@ public:
 		}
 	}
 
-	bool try_pop(T& imem)
+	bool try_pop(T& item)
 	{
 		if (!m_queue.empty()) {
 			item = std::move(m_queue.front());
