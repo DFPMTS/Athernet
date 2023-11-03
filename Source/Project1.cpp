@@ -1,6 +1,7 @@
 #include "Config.hpp"
 #include "JuceHeader.h"
 #include "LT_Encode.hpp"
+#include "MAC_Layer.hpp"
 #include "PHY_Layer.hpp"
 #include <algorithm>
 #include <chrono>
@@ -51,7 +52,8 @@ void* Project1_main_loop(void*)
 	device_setup.sampleRate = 48'000;
 	device_setup.bufferSize = 64;
 
-	auto physical_layer = std::make_unique<Athernet::PHY_Layer<float>>();
+	// auto physical_layer = std::make_unique<Athernet::PHY_Layer<float>>();
+	auto mac_layer = std::make_unique<Athernet::MAC_Layer>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -87,7 +89,9 @@ void* Project1_main_loop(void*)
 
 	srand(static_cast<unsigned int>(time(0)));
 
-	adm.addAudioCallback(physical_layer.get());
+	auto physical_layer = &mac_layer->phy_layer;
+
+	adm.addAudioCallback(physical_layer);
 
 	std::string s;
 	while (true) {
@@ -95,17 +99,17 @@ void* Project1_main_loop(void*)
 		if (s == "r") {
 			int num, len;
 			std::cin >> num >> len;
-			random_test(physical_layer.get(), num, len);
+			random_test(physical_layer, num, len);
 		} else if (s == "s") {
 			std::string file;
 			std::cin >> file;
-			Athernet::LT_Send(physical_layer.get(), file);
+			Athernet::LT_Send(physical_layer, file);
 		} else if (s == "e") {
 			break;
 		}
 	}
 
-	adm.removeAudioCallback(physical_layer.get());
+	adm.removeAudioCallback(physical_layer);
 
 	return NULL;
 }

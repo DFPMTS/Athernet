@@ -35,6 +35,17 @@ public:
 		}
 	}
 
+	bool try_pop(T& imem)
+	{
+		if (!m_queue.empty()) {
+			item = std::move(m_queue.front());
+			m_queue.pop();
+			return true;
+		} else {
+			return false;
+		}
+	}
+
 private:
 	std::queue<T> m_queue;
 	std::condition_variable consumer;

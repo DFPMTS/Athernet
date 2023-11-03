@@ -108,7 +108,7 @@ private:
 				if (confirmed) {
 					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
-					// std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
@@ -133,7 +133,7 @@ private:
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
 				static int counter = 0;
-				// std::cerr << "Begin Get Data" << (++counter) << "\n";
+				std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
@@ -142,15 +142,15 @@ private:
 					if (length[i])
 						payload_length += (1 << i);
 				}
-				// std::cerr << "Length: " << payload_length << "\n";
+				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 2) {
 					state = PhyRecvState::WAIT_HEADER;
 					// restore start
 					start = saved_start;
 					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					std::cerr << "                                    ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
@@ -178,8 +178,8 @@ private:
 
 				} else {
 					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					std::cerr << "                                    ";
+					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 

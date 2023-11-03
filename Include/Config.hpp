@@ -41,7 +41,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 3000;
+		bit_rate = 1000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -212,7 +212,7 @@ private:
 	// ! REVERSED for simplicity
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
-	int physical_buffer_size = 10'0000;
+	int physical_buffer_size = 200'0000;
 };
 
 }

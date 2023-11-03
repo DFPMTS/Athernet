@@ -13,11 +13,15 @@ template <typename T> class PHY_Sender {
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Sender()
+	PHY_Sender(std::atomic_bool& collision, std::atomic_bool& busy)
 		: config { Athernet::Config::get_instance() }
+		, stall { collision }
+		, m_busy { busy }
 	{
 		running.store(true);
 		worker = std::thread(&PHY_Sender::send_loop, this);
+		start = 0;
+		packet_size = 0;
 	}
 	~PHY_Sender()
 	{
@@ -60,6 +64,8 @@ public:
 
 				append_silence(signal);
 				state = PhySendState::SEND_SIGNAL;
+
+				m_packet_size.push(signal.size());
 			} else if (state == PhySendState::SEND_SIGNAL) {
 				if (!m_send_buffer.push(signal)) {
 					std::this_thread::yield();
@@ -76,7 +82,31 @@ public:
 
 	int pop_stream(float* buffer, int count)
 	{
-		return m_send_buffer.pop_with_conversion_to_float(buffer, count);
+		if (!stall.load()) {
+			if (!packet_size) {
+				bool succ = m_packet_size.pop(&packet_size, 1);
+				if (!succ)
+					return 0;
+			}
+			if (start == 0 && m_busy.load())
+				return 0;
+			int size = m_send_buffer.size();
+			int index = 0;
+			for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
+				buffer[index++] = m_send_buffer[i];
+			}
+			if (start >= packet_size) {
+				m_send_buffer.discard(packet_size);
+				start = 0;
+				packet_size = 0;
+			}
+			return index;
+		} else {
+			start = 0;
+			return 0;
+		}
+
+		// return m_send_buffer.pop_with_conversion_to_float(buffer, count);
 	}
 
 private:
@@ -145,7 +175,12 @@ private:
 	std::thread worker;
 	std::atomic_bool running;
 	Athernet::RingBuffer<T> m_send_buffer;
+	RingBuffer<int> m_packet_size;
 	Athernet::Config& config;
+	std::atomic_bool& stall;
+	std::atomic_bool& m_busy;
 	Signal m_silence = Signal(50);
+	int start;
+	int packet_size;
 };
 }

@@ -3,14 +3,19 @@
 #include "JuceHeader.h"
 #include "PHY_Receiver.hpp"
 #include "PHY_Sender.hpp"
+#include <atomic>
 
 namespace Athernet {
 
 template <typename T> class PHY_Layer : public juce::AudioIODeviceCallback {
 public:
-	PHY_Layer()
+	PHY_Layer(std::atomic_bool& collision, std::atomic_bool& busy)
 		: config { Athernet::Config::get_instance() }
+		, m_collision { collision }
+		, m_busy { busy }
+		, m_sender(collision, busy)
 	{
+		collision.store(false);
 	}
 
 	virtual void audioDeviceAboutToStart([[maybe_unused]] juce::AudioIODevice* device) override { }
@@ -26,7 +31,24 @@ public:
 			outputChannelData[0][i] = 0;
 		}
 
-		m_receiver.push_stream(inputChannelData[0], numSamples);
+		float sum = 0;
+		for (int i = 0; i < windows_size && i < numSamples; ++i) {
+			sum += inputChannelData[0][i] * inputChannelData[0][i];
+		}
+		m_busy.store(false);
+		for (int i = windows_size; i < numSamples; ++i) {
+			sum += inputChannelData[0][i] * inputChannelData[0][i];
+			sum -= inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
+			if (sum / windows_size > 0.001) {
+				m_busy.store(true);
+				if (sum / windows_size > 0.01) {
+					m_collision.store(true);
+					break;
+				}
+			}
+		}
+		if (!m_collision.load())
+			m_receiver.push_stream(inputChannelData[0], numSamples);
 	}
 
 	virtual void audioDeviceStopped() override { }
@@ -39,7 +61,12 @@ public:
 
 private:
 	Athernet::Config& config;
+	std::atomic_bool& m_collision;
+	std::atomic_bool& m_busy;
+
 	Athernet::PHY_Receiver<T> m_receiver;
 	Athernet::PHY_Sender<T> m_sender;
+
+	int windows_size = 32;
 };
 }
