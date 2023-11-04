@@ -85,7 +85,7 @@ public:
 		static int counter = 0;
 		control.previlege_duration.fetch_sub(1);
 		if (control.previlege_node == config.get_self_id()
-			&& (control.previlege_duration.load() > 100
+			&& (control.previlege_duration.load() > 120
 				|| (control.previlege_duration.load() > 0 && start != 0))) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);
@@ -106,7 +106,7 @@ public:
 			counter = rand() % 60;
 			return index;
 		} else {
-			if (control.previlege_node != config.get_self_id() && control.previlege_duration.load() > 100) {
+			if (control.previlege_node != config.get_self_id() && control.previlege_duration.load() > 120) {
 				return 0;
 			}
 			if (control.previlege_duration.load() < 0) {
@@ -131,7 +131,7 @@ public:
 				if (start >= packet_size) {
 					m_send_buffer.discard(packet_size);
 					start = 0;
-					counter = (control.previlege_node == config.get_self_id() ? 13 : 0);
+					counter = (control.previlege_node == config.get_self_id() ? 15 : 0);
 					packet_size = 0;
 				}
 				return index;
