@@ -85,7 +85,7 @@ public:
 		static int counter = 0;
 		control.previlege_duration.fetch_sub(1);
 		if (control.previlege_node == config.get_self_id()
-			&& (control.previlege_duration.load() > 50
+			&& (control.previlege_duration.load() > 100
 				|| (control.previlege_duration.load() > 0 && start != 0))) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);

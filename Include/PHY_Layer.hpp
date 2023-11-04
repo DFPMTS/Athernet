@@ -44,9 +44,9 @@ public:
 				* inputChannelData[0][i];
 			sum -= inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size]
 				* inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
-			if (sum / windows_size > 0.00001) {
+			if (sum / windows_size > 0.001) {
 				control.busy.store(true);
-				if (sum / windows_size > 0.00004) {
+				if (sum / windows_size > 2) {
 					control.collision.store(true);
 					break;
 				}

@@ -170,7 +170,7 @@ private:
 					good++;
 
 					if (control.previlege_node.load() == -1) {
-						control.previlege_duration.store(700);
+						control.previlege_duration.store(300);
 						control.previlege_node.store(bits[bits.size() - 1]);
 					}
 					bits.pop_back();
