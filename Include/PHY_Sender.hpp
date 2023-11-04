@@ -105,6 +105,9 @@ public:
 			}
 			return index;
 		} else {
+			if (control.previlege_node != config.get_self_id() && control.previlege_duration.load() > 50) {
+				return 0;
+			}
 			if (control.previlege_duration.load() < 0) {
 				control.previlege_node.store(-1);
 			}
