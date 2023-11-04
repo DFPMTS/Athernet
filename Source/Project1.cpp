@@ -79,7 +79,7 @@ void* Project1_main_loop(void*)
 
 // device_setup.inputDeviceName = "MacBook Pro Microphone";
 #ifndef WIN
-	device_setup.inputDeviceName = "USB Audio Device ";
+	device_setup.inputDeviceName = "USB Audio Device";
 	device_setup.outputDeviceName = "USB Audio Device";
 #endif
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
