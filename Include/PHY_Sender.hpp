@@ -139,7 +139,7 @@ public:
 				// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
 				start = 0;
 				if (counter < 0) {
-					counter = rand() % (control.previlege_node == config.get_self_id() ? 120 : 60);
+					counter = rand() % (control.previlege_node == config.get_self_id() ? 60 : 30);
 				}
 				return 0;
 			}
