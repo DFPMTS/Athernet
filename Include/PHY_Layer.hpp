@@ -38,11 +38,13 @@ public:
 		control.busy.store(false);
 		control.collision.store(false);
 		for (int i = windows_size; i < numSamples; ++i) {
-			sum += inputChannelData[0][i] * inputChannelData[0][i];
-			sum -= inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
-			if (sum / windows_size > 0.001) {
+			sum += inputChannelData[0][i] * inputChannelData[0][i] * inputChannelData[0][i]
+				* inputChannelData[0][i];
+			sum -= inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size]
+				* inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
+			if (sum / windows_size > 0.01) {
 				control.busy.store(true);
-				if (sum / windows_size > 0.006) {
+				if (sum / windows_size > 3) {
 					control.collision.store(true);
 					break;
 				}

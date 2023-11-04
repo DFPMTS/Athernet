@@ -76,9 +76,11 @@ void* Project1_main_loop(void*)
 		std::cerr << "-------------------\n";
 	}
 
-	// device_setup.inputDeviceName = "MacBook Pro Microphone";
-	// device_setup.inputDeviceName = "USB Audio Device (2)";
-	// device_setup.outputDeviceName = "USB Audio Device (1)";
+// device_setup.inputDeviceName = "MacBook Pro Microphone";
+#ifndef WIN
+	device_setup.inputDeviceName = "USB Audio Device";
+	device_setup.outputDeviceName = "USB Audio Device";
+#endif
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";
 
 	adm.setAudioDeviceSetup(device_setup, false);
