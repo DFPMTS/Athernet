@@ -83,8 +83,8 @@ public:
 	int pop_stream(float* buffer, int count)
 	{
 		static int counter = 0;
-		if (control.previlege_node == config.get_self_id()
-			&& (control.previlege_duration.load() > 100 || start != 0)) {
+		control.previlege_duration.fetch_sub(1);
+		if (control.previlege_duration.load() > 50 || (control.previlege_duration.load() > 0 && start != 0)) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);
 				if (!succ)
@@ -101,16 +101,11 @@ public:
 				counter = 0;
 				packet_size = 0;
 			}
-			control.previlege_duration.fetch_sub(1);
-
 			return index;
 		} else {
-
-			control.previlege_duration.fetch_sub(1);
 			if (control.previlege_duration.load() < 0) {
 				control.previlege_node.store(-1);
 			}
-
 			if (!control.collision.load()) {
 				if (!packet_size) {
 					bool succ = m_packet_size.pop(&packet_size, 1);
