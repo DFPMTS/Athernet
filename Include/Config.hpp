@@ -185,6 +185,15 @@ public:
 
 	const std::vector<int>& get_crc() const { return crc; }
 
+	int get_self_id()
+	{
+#ifdef WIN
+		return 0;
+#else
+		return 1;
+#endif
+	}
+
 private:
 	int bit_rate;
 

@@ -25,10 +25,11 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 	for (int i = 0; i < num_packets; ++i) {
 		std::vector<int> a;
 		for (int j = 0; j < packet_length; ++j) {
-			// if (rand() % 2)
-			// 	a.push_back(1);
-			// else
+#ifdef WIN
 			a.push_back(0);
+#else
+			a.push_back(1);
+#endif
 		}
 		a.push_back(0);
 
@@ -78,7 +79,7 @@ void* Project1_main_loop(void*)
 
 // device_setup.inputDeviceName = "MacBook Pro Microphone";
 #ifndef WIN
-	device_setup.inputDeviceName = "USB Audio Device";
+	device_setup.inputDeviceName = "USB Audio Device ";
 	device_setup.outputDeviceName = "USB Audio Device";
 #endif
 	// device_setup.outputDeviceName = "MacBook Pro Speakers";

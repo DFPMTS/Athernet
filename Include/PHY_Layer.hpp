@@ -33,7 +33,8 @@ public:
 
 		float sum = 0;
 		for (int i = 0; i < windows_size && i < numSamples; ++i) {
-			sum += inputChannelData[0][i] * inputChannelData[0][i];
+			sum += inputChannelData[0][i] * inputChannelData[0][i] * inputChannelData[0][i]
+				* inputChannelData[0][i];
 		}
 		control.busy.store(false);
 		control.collision.store(false);
@@ -42,9 +43,9 @@ public:
 				* inputChannelData[0][i];
 			sum -= inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size]
 				* inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
-			if (sum / windows_size > 0.01) {
+			if (sum / windows_size > 0.00001) {
 				control.busy.store(true);
-				if (sum / windows_size > 3) {
+				if (sum / windows_size > 0.00004) {
 					control.collision.store(true);
 					break;
 				}
