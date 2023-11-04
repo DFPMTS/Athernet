@@ -14,6 +14,7 @@ public:
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 		, m_sender(mac_control)
+		, m_receiver(mac_control)
 	{
 		control.collision.store(false);
 	}

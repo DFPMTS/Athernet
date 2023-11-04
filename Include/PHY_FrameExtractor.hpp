@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "MAC_Control.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <atomic>
@@ -13,11 +14,12 @@ template <typename T> class FrameExtractor {
 
 public:
 	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue,
-		Athernet::SyncQueue<Frame>& decoder_queue)
+		Athernet::SyncQueue<Frame>& decoder_queue, MAC_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, m_recv_buffer { recv_buffer }
 		, m_recv_queue { recv_queue }
 		, m_decoder_queue { decoder_queue }
+		, control { mac_control }
 	{
 		running.store(true);
 		start = 0;
@@ -166,6 +168,13 @@ private:
 						bits.pop_back();
 					}
 					good++;
+
+					if (control.previlege_node.load() == -1) {
+						control.previlege_duration.store(500);
+						control.previlege_node.store(bits[bits.size() - 1]);
+					}
+					bits.pop_back();
+
 					// dispatch normal frame to recv_queue, and coded frame to decoder_queue
 					if (!bits[bits.size() - 1]) {
 						bits.pop_back();
@@ -394,6 +403,8 @@ private:
 	Athernet::RingBuffer<T>& m_recv_buffer;
 	Athernet::SyncQueue<Frame>& m_recv_queue;
 	Athernet::SyncQueue<Frame>& m_decoder_queue;
+	MAC_Control& control;
+
 	std::thread worker;
 	std::atomic_bool running;
 	int start;

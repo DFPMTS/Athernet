@@ -1,6 +1,7 @@
 #pragma once
 #include "Config.hpp"
 #include "LT_Decode.hpp"
+#include "MAC_Control.hpp"
 #include "PHY_FrameExtractor.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
@@ -15,9 +16,10 @@ template <typename T> class PHY_Receiver {
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Receiver()
+	PHY_Receiver(MAC_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
-		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue)
+		, control { mac_control }
+		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue, mac_control)
 		, decoder(m_decoder_queue, m_recv_queue)
 	{
 		display_running.store(true);
@@ -95,6 +97,7 @@ public:
 
 private:
 	Athernet::Config& config;
+	MAC_Control& control;
 	Athernet::RingBuffer<T> m_recv_buffer;
 	Athernet::FrameExtractor<T> frame_extractor;
 	Athernet::SyncQueue<Frame> m_recv_queue;

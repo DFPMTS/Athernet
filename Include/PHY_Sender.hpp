@@ -83,18 +83,13 @@ public:
 	int pop_stream(float* buffer, int count)
 	{
 		static int counter = 0;
-
-		if (!control.collision.load()) {
+		if (control.previlege_node == config.get_self_id()
+			&& (control.previlege_duration.load() > 100 || start != 0)) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);
 				if (!succ)
 					return 0;
 			}
-
-			if (start == 0 && (control.busy.load() || --counter > 0))
-				return 0;
-
-			// std::cerr << "-----CountingDown-----  " << counter << "\n";
 			int size = m_send_buffer.size();
 			int index = 0;
 			for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
@@ -106,16 +101,48 @@ public:
 				counter = 0;
 				packet_size = 0;
 			}
+			control.previlege_duration.fetch_sub(1);
+
 			return index;
 		} else {
-			// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
-			start = 0;
-			if (counter < 0) {
-				counter = 13 * (rand() % 10);
-			}
-			return 0;
-		}
 
+			control.previlege_duration.fetch_sub(1);
+			if (control.previlege_duration.load() < 0) {
+				control.previlege_node.store(-1);
+			}
+
+			if (!control.collision.load()) {
+				if (!packet_size) {
+					bool succ = m_packet_size.pop(&packet_size, 1);
+					if (!succ)
+						return 0;
+				}
+
+				if (start == 0 && (control.busy.load() || --counter > 0))
+					return 0;
+
+				// std::cerr << "-----CountingDown-----  " << counter << "\n";
+				int size = m_send_buffer.size();
+				int index = 0;
+				for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
+					buffer[index++] = m_send_buffer[i];
+				}
+				if (start >= packet_size) {
+					m_send_buffer.discard(packet_size);
+					start = 0;
+					counter = 0;
+					packet_size = 0;
+				}
+				return index;
+			} else {
+				// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
+				start = 0;
+				if (counter < 0) {
+					counter = 13 * (rand() % 10);
+				}
+				return 0;
+			}
+		}
 		// return m_send_buffer.pop_with_conversion_to_float(buffer, count);
 	}
 
