@@ -103,9 +103,10 @@ public:
 				counter = 0;
 				packet_size = 0;
 			}
+			counter = rand() % 60;
 			return index;
 		} else {
-			if (control.previlege_node != config.get_self_id() && control.previlege_duration.load() > 50) {
+			if (control.previlege_node != config.get_self_id() && control.previlege_duration.load() > 100) {
 				return 0;
 			}
 			if (control.previlege_duration.load() < 0) {
@@ -130,7 +131,7 @@ public:
 				if (start >= packet_size) {
 					m_send_buffer.discard(packet_size);
 					start = 0;
-					counter = 0;
+					counter = (control.previlege_node == config.get_self_id() ? 13 : 0);
 					packet_size = 0;
 				}
 				return index;
@@ -138,7 +139,7 @@ public:
 				// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
 				start = 0;
 				if (counter < 0) {
-					counter = 13 * (rand() % 4);
+					counter = rand() % (control.previlege_node == config.get_self_id() ? 120 : 60);
 				}
 				return 0;
 			}

@@ -46,7 +46,7 @@ public:
 				* inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
 			if (sum / windows_size > 0.0001) {
 				control.busy.store(true);
-				if (sum / windows_size > 0.003) {
+				if (sum / windows_size > config.get_collision_threshold()) {
 					control.collision.store(true);
 					break;
 				}
