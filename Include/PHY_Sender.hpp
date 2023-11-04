@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Config.hpp"
+#include "MAC_Control.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <mutex>
@@ -13,10 +14,9 @@ template <typename T> class PHY_Sender {
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Sender(std::atomic_bool& collision, std::atomic_bool& busy)
+	PHY_Sender(MAC_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
-		, stall { collision }
-		, m_busy { busy }
+		, control { mac_control }
 	{
 		running.store(true);
 		worker = std::thread(&PHY_Sender::send_loop, this);
@@ -83,14 +83,18 @@ public:
 	int pop_stream(float* buffer, int count)
 	{
 		static int counter = 0;
-		if (!stall.load()) {
+
+		if (!control.collision.load()) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);
 				if (!succ)
 					return 0;
 			}
-			if (start == 0 && (m_busy.load() || --counter > 0))
+
+			if (start == 0 && (control.busy.load() || --counter > 0))
 				return 0;
+
+			// std::cerr << "-----CountingDown-----  " << counter << "\n";
 			int size = m_send_buffer.size();
 			int index = 0;
 			for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
@@ -99,12 +103,16 @@ public:
 			if (start >= packet_size) {
 				m_send_buffer.discard(packet_size);
 				start = 0;
+				counter = 0;
 				packet_size = 0;
 			}
 			return index;
 		} else {
+			// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
 			start = 0;
-			counter = rand() % 20;
+			if (counter < 0) {
+				counter = rand() % 100;
+			}
 			return 0;
 		}
 
@@ -179,8 +187,9 @@ private:
 	Athernet::RingBuffer<T> m_send_buffer;
 	RingBuffer<int> m_packet_size;
 	Athernet::Config& config;
-	std::atomic_bool& stall;
-	std::atomic_bool& m_busy;
+
+	MAC_Control& control;
+
 	Signal m_silence = Signal(50);
 	int start;
 	int packet_size;

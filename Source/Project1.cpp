@@ -25,10 +25,10 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 	for (int i = 0; i < num_packets; ++i) {
 		std::vector<int> a;
 		for (int j = 0; j < packet_length; ++j) {
-			if (rand() % 2)
-				a.push_back(1);
-			else
-				a.push_back(0);
+			// if (rand() % 2)
+			// 	a.push_back(1);
+			// else
+			a.push_back(0);
 		}
 		a.push_back(0);
 

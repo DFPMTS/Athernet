@@ -73,6 +73,7 @@ jucer_project_files("Project2/Include"
   .         .         .         "Include/LT_Encode.hpp"
   .         .         .         "Include/LT_Decode.hpp"
   .         .         .         "Include/MAC_Layer.hpp"
+  .         .         .         "Include/MAC_Control.hpp"
 )
 
 # --------------------------------Source----------------------------------- #

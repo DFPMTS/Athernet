@@ -1,6 +1,7 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "MAC_Control.hpp"
 #include "PHY_Layer.hpp"
 #include <atomic>
 
@@ -9,7 +10,7 @@ namespace Athernet {
 class MAC_Layer {
 public:
 	MAC_Layer()
-		: phy_layer(stall, busy)
+		: phy_layer(control)
 	{
 		running.store(true);
 		worker = std::thread(&MAC_Layer::work, this);
@@ -17,12 +18,12 @@ public:
 
 	void work()
 	{
-		while (running.load()) {
-			if (stall.load()) {
-				stall.store(false);
-				std::cerr << "--------------Collision--------------\n";
-			}
-		}
+		// while (running.load()) {
+		// if (stall.load()) {
+		// 	stall.store(false);
+		// 	std::cerr << "--------------Collision--------------\n";
+		// }
+		// }
 	}
 
 	~MAC_Layer()
@@ -31,8 +32,7 @@ public:
 		worker.join();
 	}
 
-	std::atomic_bool stall;
-	std::atomic_bool busy;
+	MAC_Control control;
 
 	PHY_Layer<float> phy_layer;
 

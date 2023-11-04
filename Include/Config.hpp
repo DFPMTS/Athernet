@@ -41,7 +41,7 @@ public:
 		auto PI = acos(-1);
 
 		// * Bit Rate
-		bit_rate = 1000;
+		bit_rate = 3000;
 
 		// * Sample Rate
 		sample_rate = 48'000;
@@ -50,7 +50,7 @@ public:
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 3'000;
 			preamble_f2 = 15'000;
-			preamble_length = 120;
+			preamble_length = 80;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);

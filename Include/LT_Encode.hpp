@@ -74,7 +74,7 @@ template <typename T> void LT_Send(PHY_Layer<T>* physical_layer, std::string fil
 		mat.push_back(std::move(a));
 	}
 
-	double packet_fail_rate = 0.9;
+	double packet_fail_rate = 0.75;
 	int packets_to_send = static_cast<int>((num_packets + 25) / packet_fail_rate);
 
 	while (packets_to_send--) {
@@ -108,7 +108,7 @@ template <typename T> void LT_Send(PHY_Layer<T>* physical_layer, std::string fil
 		for (auto x : frame)
 			actual_frame.push_back(x);
 
-		actual_frame.push_back(group_flag);
+		actual_frame.push_back(1);
 		actual_frame.push_back(1);
 
 		physical_layer->send_frame(actual_frame);

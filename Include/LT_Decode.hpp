@@ -42,8 +42,8 @@ public:
 				std::this_thread::yield();
 				continue;
 			}
-			if (frame[frame.size() - 1] != group_flag) {
-				group_flag = frame[frame.size() - 1];
+			if (group_flag == -1) {
+				group_flag = 0;
 				for (int i = 0; i < 100; ++i) {
 					G[i] = std::vector<int>(100);
 					Y[i] = std::vector<int>(frame.size() - 1 - config.get_phy_coding_overhead());
@@ -51,6 +51,9 @@ public:
 				memset(num_ones, 0, sizeof(num_ones));
 				empty_rows = 100;
 			}
+
+			if (frame[frame.size() - 1] != group_flag)
+				continue;
 
 			if (!empty_rows)
 				continue;
