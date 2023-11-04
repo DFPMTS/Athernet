@@ -135,7 +135,7 @@ public:
 				// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
 				start = 0;
 				if (counter < 0) {
-					counter = 13 * (rand() % 10);
+					counter = 13 * (rand() % 4);
 				}
 				return 0;
 			}
