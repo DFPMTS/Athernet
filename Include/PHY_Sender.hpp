@@ -145,8 +145,11 @@ public:
 				}
 			}
 		} else {
-			if (control.previlege_node != previledge_node ^ 1)
+			if (control.previlege_node != previledge_node)
 				return 0;
+			else {
+				sending = 1;
+			}
 			// shut up and get ready to take over
 			if (!sending) {
 				if (control.busy.load()) {
@@ -155,6 +158,7 @@ public:
 				} else {
 					// new slice founded
 					++slice_count;
+					std::cerr << "Count++\n";
 					if (slice_count > slice_limit) {
 						// transfer to another node
 						previledge_node ^= 1;
@@ -167,6 +171,7 @@ public:
 				if (control.collision.load()) {
 					// halt and jam
 					sending = 0;
+					std::cerr << "Clash!\n";
 				}
 			}
 			return 0;
