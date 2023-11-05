@@ -149,17 +149,17 @@ public:
 				}
 			}
 		} else {
-			static int acquired = 0;
+			static int released = 0, acquired = 0;
 			// shut up and get ready to take over
-			if (slice_count >= slice_limit) {
+			if (!control.busy.load() && released) {
+				// acquire
+				released = 0;
 				previledge_node ^= 1;
-				slice_count = 0;
-				std::cerr << "Switch!\n";
 			}
-			if (control.collision.load() && !acquired) {
+			if (control.collision.load() && !released) {
 				// halt and jam
 				sending = 0;
-				acquired = 1;
+				released = 1;
 				++slice_count;
 				std::cerr << "Clash!\n";
 			} else {

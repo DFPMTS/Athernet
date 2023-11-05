@@ -31,21 +31,26 @@ public:
 			sum += inputChannelData[0][i] * inputChannelData[0][i] * inputChannelData[0][i]
 				* inputChannelData[0][i];
 		}
-		control.busy.store(false);
+
 		control.collision.store(false);
 		for (int i = windows_size; i < numSamples; ++i) {
 			sum += inputChannelData[0][i] * inputChannelData[0][i] * inputChannelData[0][i]
 				* inputChannelData[0][i];
 			sum -= inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size]
 				* inputChannelData[0][i - windows_size] * inputChannelData[0][i - windows_size];
-			if (sum / windows_size > 0.00001) {
-				control.busy.store(true);
-				if (sum / windows_size > config.get_collision_threshold()) {
-					control.collision.store(true);
-					break;
-				}
+			if (sum / windows_size > config.get_collision_threshold()) {
+				control.collision.store(true);
+				break;
 			}
 		}
+		sum = 0;
+		control.busy.store(false);
+		for (int i = 0; i < numSamples; ++i) {
+			sum += inputChannelData[0][i] * inputChannelData[0][i];
+		}
+		if (sum > 0.001)
+			control.busy.store(true);
+
 		if (!control.collision.load())
 			m_receiver.push_stream(inputChannelData[0], numSamples);
 
