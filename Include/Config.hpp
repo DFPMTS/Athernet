@@ -194,7 +194,7 @@ public:
 #endif
 	}
 
-	float get_collision_threshold() const { return 0.0015; }
+	float get_collision_threshold() const { return 0.0005; }
 
 private:
 	int bit_rate;

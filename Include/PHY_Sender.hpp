@@ -83,68 +83,92 @@ public:
 	int pop_stream(float* buffer, int count)
 	{
 		static int counter = 0;
-		control.previlege_duration.fetch_sub(1);
-		if (control.previlege_node == config.get_self_id()
-			&& (control.previlege_duration.load() > 120
-				|| (control.previlege_duration.load() > 0 && start != 0))) {
+
+		static int slice_limit = 5;
+		static int previledge_node = 0;
+		static int sending = 0;
+		static int slice_count = 0;
+		static int jammed = 0;
+
+		if (previledge_node == config.get_self_id()) {
 			if (!packet_size) {
 				bool succ = m_packet_size.pop(&packet_size, 1);
 				if (!succ)
 					return 0;
 			}
-			int size = m_send_buffer.size();
-			int index = 0;
-			for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
-				buffer[index++] = m_send_buffer[i];
-			}
-			if (start >= packet_size) {
-				m_send_buffer.discard(packet_size);
-				start = 0;
-				counter = 0;
-				packet_size = 0;
-			}
-			counter = rand() % 60;
-			return index;
-		} else {
-			if (control.previlege_node != config.get_self_id() && control.previlege_duration.load() > 120) {
-				return 0;
-			}
-			if (control.previlege_duration.load() < 0) {
-				control.previlege_node.store(-1);
-			}
-			if (!control.collision.load()) {
-				if (!packet_size) {
-					bool succ = m_packet_size.pop(&packet_size, 1);
-					if (!succ)
-						return 0;
-				}
-
-				if (start == 0 && (control.busy.load() || --counter > 0))
+			if (!sending) {
+				if (control.busy.load()) {
+					// waiting
 					return 0;
-
-				// std::cerr << "-----CountingDown-----  " << counter << "\n";
-				int size = m_send_buffer.size();
-				int index = 0;
-				for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
-					buffer[index++] = m_send_buffer[i];
-				}
-				if (start >= packet_size) {
-					m_send_buffer.discard(packet_size);
-					start = 0;
-					counter = (control.previlege_node == config.get_self_id() ? 15 : 0);
-					packet_size = 0;
-				}
-				return index;
-			} else {
-				// std::cerr << "---!!!!!!!!!!!---Collision---!!!!!!!!!!----" << counter << "\n";
-				start = 0;
-				if (counter < 0) {
-					counter = rand() % (control.previlege_node == config.get_self_id() ? 60 : 30);
+				} else {
+					// new slice founded
+					++slice_count;
+					jammed = 0;
+					if (slice_count > slice_limit) {
+						// transfer to another node
+						previledge_node ^= 1;
+						slice_count = 0;
+						return 0;
+					} else {
+						// another slice begins
+						sending = 1;
+					}
 				}
 				return 0;
+			} else {
+				if (control.collision.load()) {
+					// halt and jam
+					sending = 0;
+					start = 0;
+					if (!jammed) {
+						for (int i = 0; i < count; ++i) {
+							buffer[i] = (float)(50 + rand() % 50) / 100;
+						}
+						jammed = 1;
+						return count;
+					} else {
+						return 0;
+					}
+				} else {
+					// continue transimitting
+					int size = m_send_buffer.size();
+					int index = 0;
+					for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
+						buffer[index++] = m_send_buffer[i];
+					}
+					if (start >= packet_size) {
+						m_send_buffer.discard(packet_size);
+						start = 0;
+						packet_size = 0;
+					}
+					return index;
+				}
 			}
+		} else {
+			// shut up and get ready to take over
+			if (!sending) {
+				if (control.busy.load()) {
+					// waiting
+					return 0;
+				} else {
+					// new slice founded
+					++slice_count;
+					if (slice_count > slice_limit) {
+						// transfer to another node
+						previledge_node ^= 1;
+						slice_count = 0;
+					} else {
+						// another slice begins
+					}
+				}
+			} else {
+				if (control.collision.load()) {
+					// halt and jam
+					sending = 0;
+				}
+			}
+			return 0;
 		}
-		// return m_send_buffer.pop_with_conversion_to_float(buffer, count);
 	}
 
 private:
@@ -218,7 +242,7 @@ private:
 
 	MAC_Control& control;
 
-	Signal m_silence = Signal(50);
+	Signal m_silence = Signal(10);
 	int start;
 	int packet_size;
 };

@@ -26,12 +26,6 @@ public:
 		[[maybe_unused]] int numOutputChannels, [[maybe_unused]] int numSamples,
 		[[maybe_unused]] const juce::AudioIODeviceCallbackContext& context) override
 	{
-		int samples_wrote = m_sender.pop_stream(outputChannelData[0], numSamples);
-
-		for (int i = samples_wrote; i < numSamples; ++i) {
-			outputChannelData[0][i] = 0;
-		}
-
 		float sum = 0;
 		for (int i = 0; i < windows_size && i < numSamples; ++i) {
 			sum += inputChannelData[0][i] * inputChannelData[0][i] * inputChannelData[0][i]
@@ -54,6 +48,11 @@ public:
 		}
 		if (!control.collision.load())
 			m_receiver.push_stream(inputChannelData[0], numSamples);
+
+		int samples_wrote = m_sender.pop_stream(outputChannelData[0], numSamples);
+		for (int i = samples_wrote; i < numSamples; ++i) {
+			outputChannelData[0][i] = 0;
+		}
 	}
 
 	virtual void audioDeviceStopped() override { }
