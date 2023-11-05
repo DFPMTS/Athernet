@@ -101,20 +101,7 @@ public:
 					// waiting
 					return 0;
 				} else {
-					// new slice founded
-					++slice_count;
-					std::cerr << "Count++\n";
-					jammed = 0;
-					if (slice_count > slice_limit) {
-						// transfer to another node
-						previledge_node ^= 1;
-						slice_count = 0;
-						std::cerr << "Switch Sides!\n";
-						return 0;
-					} else {
-						// another slice begins
-						sending = 1;
-					}
+					sending = 1;
 				}
 				return 0;
 			} else {
@@ -122,17 +109,17 @@ public:
 					// halt and jam
 					sending = 0;
 					start = 0;
-					std::cout << "Collide\n";
-					if (!jammed) {
-						for (int i = 0; i < count; ++i) {
-							buffer[i] = (float)(50 + rand() % 50) / 100;
-						}
-						std::cerr << "Jamming\n";
-						jammed = 1;
-						return count;
-					} else {
-						return 0;
+
+					previledge_node ^= 1;
+					sending = 0;
+
+					for (int i = 0; i < count; ++i) {
+						buffer[i] = (float)(50 + rand() % 50) / 100;
 					}
+					std::cerr << "Jamming\n";
+					jammed = 1;
+					return count;
+
 				} else {
 					// continue transimitting
 					int size = m_send_buffer.size();
@@ -155,6 +142,7 @@ public:
 				// acquire
 				released = 0;
 				previledge_node ^= 1;
+				sending = 0;
 			}
 			if (control.collision.load() && !released) {
 				// halt and jam
