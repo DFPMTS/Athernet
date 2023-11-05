@@ -103,11 +103,13 @@ public:
 				} else {
 					// new slice founded
 					++slice_count;
+					std::cerr << "Count++\n";
 					jammed = 0;
 					if (slice_count > slice_limit) {
 						// transfer to another node
 						previledge_node ^= 1;
 						slice_count = 0;
+						std::cerr << "Switch Sides!\n";
 						return 0;
 					} else {
 						// another slice begins
@@ -120,10 +122,12 @@ public:
 					// halt and jam
 					sending = 0;
 					start = 0;
+					std::cout << "Collide\n";
 					if (!jammed) {
 						for (int i = 0; i < count; ++i) {
 							buffer[i] = (float)(50 + rand() % 50) / 100;
 						}
+						std::cerr << "Jamming\n";
 						jammed = 1;
 						return count;
 					} else {
@@ -145,42 +149,21 @@ public:
 				}
 			}
 		} else {
-			static int switched = 0;
-			if (control.previlege_node != previledge_node) {
-				switched = 0;
-				return 0;
-			} else {
-				if (!switched) {
-					sending = 1;
-					switched = 1;
-				}
-			}
+			static int acquired = 0;
 			// shut up and get ready to take over
-			if (!sending) {
-				if (control.busy.load()) {
-					// waiting
-					std::cerr << "BUSY\n";
-					return 0;
-				} else {
-					std::cerr << "IDLE\n";
-					// new slice founded
-					++slice_count;
-					std::cerr << "Count++\n";
-					if (slice_count > slice_limit) {
-						// transfer to another node
-						previledge_node ^= 1;
-						slice_count = 0;
-					} else {
-						// another slice begins
-						sending = 1;
-					}
-				}
+			if (slice_count >= slice_limit) {
+				previledge_node ^= 1;
+				slice_count = 0;
+				std::cerr << "Switch!\n";
+			}
+			if (control.collision.load() && !acquired) {
+				// halt and jam
+				sending = 0;
+				acquired = 1;
+				++slice_count;
+				std::cerr << "Clash!\n";
 			} else {
-				if (control.collision.load()) {
-					// halt and jam
-					sending = 0;
-					std::cerr << "Clash!\n";
-				}
+				acquired = 0;
 			}
 			return 0;
 		}
