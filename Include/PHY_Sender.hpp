@@ -145,6 +145,8 @@ public:
 				}
 			}
 		} else {
+			if (control.previlege_node == -1)
+				return 0;
 			// shut up and get ready to take over
 			if (!sending) {
 				if (control.busy.load()) {
