@@ -107,20 +107,22 @@ public:
 			} else {
 				if (control.collision.load()) {
 					// halt and jam
-					sending = 0;
-					start = 0;
-
-					previledge_node ^= 1;
-					sending = 0;
-
-					for (int i = 0; i < count; ++i) {
-						buffer[i] = (float)(50 + rand() % 50) / 100;
+					if (!jammed) {
+						start = 0;
+						sending = 0;
+						for (int i = 0; i < count; ++i) {
+							buffer[i] = (float)(50 + rand() % 50) / 100;
+						}
+						std::cerr << "Jamming\n";
+						jammed = 1;
 					}
-					std::cerr << "Jamming\n";
-					jammed = 1;
 					return count;
 
 				} else {
+					if (jammed) {
+						previledge_node ^= 1;
+						return 0;
+					}
 					// continue transimitting
 					int size = m_send_buffer.size();
 					int index = 0;
@@ -143,6 +145,7 @@ public:
 				released = 0;
 				previledge_node ^= 1;
 				sending = 0;
+				jammed = 0;
 			}
 			if (control.collision.load() && !released) {
 				// halt and jam
