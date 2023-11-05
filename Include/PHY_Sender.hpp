@@ -145,17 +145,24 @@ public:
 				}
 			}
 		} else {
-			if (control.previlege_node != previledge_node)
+			static int switched = 0;
+			if (control.previlege_node != previledge_node) {
+				switched = 0;
 				return 0;
-			else {
-				sending = 1;
+			} else {
+				if (!switched) {
+					sending = 1;
+					switched = 1;
+				}
 			}
 			// shut up and get ready to take over
 			if (!sending) {
 				if (control.busy.load()) {
 					// waiting
+					std::cerr << "BUSY\n";
 					return 0;
 				} else {
+					std::cerr << "IDLE\n";
 					// new slice founded
 					++slice_count;
 					std::cerr << "Count++\n";
@@ -165,6 +172,7 @@ public:
 						slice_count = 0;
 					} else {
 						// another slice begins
+						sending = 1;
 					}
 				}
 			} else {
