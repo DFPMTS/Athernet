@@ -154,11 +154,12 @@ public:
 					m_send_buffer.discard(packet_size);
 					start = 0;
 					packet_size = 0;
-					backoff = 1;
 					if (++sent >= hold_limit) {
 						// yield
-						counter = slot;
+						counter = (rand() % backoff + 2) * slot;
+						hold_channel = 0;
 					}
+					backoff = 1;
 				}
 				return index;
 			}
