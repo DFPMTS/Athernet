@@ -66,8 +66,8 @@ jucer_project_files("Project2/Include"
   .         .         .         "Include/Config.hpp"  
   .         .         .         "Include/RingBuffer.hpp"
   .         .         .         "Include/SyncQueue.hpp"
-  .         .         .         "Include/PHY_Sender.hpp"
-  .         .         .         "Include/PHY_Receiver.hpp"
+  .         .         .         "Include/MAC_Sender.hpp"
+  .         .         .         "Include/MAC_Receiver.hpp"
   .         .         .         "Include/PHY_FrameExtractor.hpp"
   .         .         .         "Include/PHY_Layer.hpp"
   .         .         .         "Include/PHY_Unit.hpp"
@@ -82,7 +82,7 @@ jucer_project_files("Project2/Include"
 jucer_project_files("Project2/Source"
 # Compile   Xcode     Binary    File
 #           Resource  Resource
-  x         .         .         "Source/Project1.cpp"  
+  x         .         .         "Source/Project2.cpp"  
 )
 
 # ------------------------------------------------------------------------- #

@@ -12,21 +12,21 @@
 
 namespace Athernet {
 
-template <typename T> class PHY_Receiver {
+template <typename T> class MAC_Receiver {
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Receiver(Protocol_Control& mac_control)
+	MAC_Receiver(Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue, mac_control)
 		, decoder(m_decoder_queue, m_recv_queue)
 	{
 		display_running.store(true);
-		display_worker = std::thread(&PHY_Receiver::display_frame, this);
+		display_worker = std::thread(&MAC_Receiver::display_frame, this);
 	}
 
-	~PHY_Receiver()
+	~MAC_Receiver()
 	{
 		display_running.store(false);
 		display_worker.join();

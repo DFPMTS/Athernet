@@ -10,21 +10,21 @@
 #include <vector>
 namespace Athernet {
 
-template <typename T> class PHY_Sender {
+template <typename T> class MAC_Sender {
 	using Signal = std::vector<T>;
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Sender(Protocol_Control& mac_control)
+	MAC_Sender(Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 	{
 		running.store(true);
-		worker = std::thread(&PHY_Sender::send_loop, this);
+		worker = std::thread(&MAC_Sender::send_loop, this);
 		start = 0;
 		packet.reset();
 	}
-	~PHY_Sender()
+	~MAC_Sender()
 	{
 		running.store(false);
 		worker.join();
@@ -227,8 +227,6 @@ private:
 	std::atomic_bool running;
 	RingBuffer<std::shared_ptr<PHY_Unit>> m_send_buffer;
 	RingBuffer<std::shared_ptr<PHY_Unit>> m_resend_buffer;
-	enum class SendPacketState { ACKED, SENT, NOT_SENT };
-	enum class RecvPacketState { ACKED, RECEIVED, NOT_RECEIVED };
 	Config& config;
 
 	Protocol_Control& control;

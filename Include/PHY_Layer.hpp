@@ -1,8 +1,8 @@
 #pragma once
 
 #include "JuceHeader.h"
-#include "PHY_Receiver.hpp"
-#include "PHY_Sender.hpp"
+#include "MAC_Receiver.hpp"
+#include "MAC_Sender.hpp"
 #include "Protocol_Control.hpp"
 #include <atomic>
 
@@ -69,12 +69,12 @@ public:
 	~PHY_Layer() { }
 
 private:
-	Athernet::Config& config;
+	Config& config;
 
 	Protocol_Control& control;
 
-	Athernet::PHY_Receiver<T> m_receiver;
-	Athernet::PHY_Sender<T> m_sender;
+	MAC_Receiver<T> m_receiver;
+	MAC_Sender<T> m_sender;
 
 	int windows_size = 32;
 };
