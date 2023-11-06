@@ -175,7 +175,7 @@ public:
 		static int cur_ack = -1;
 
 		if (!packet) {
-			if (ack_timeout > slot * 2) {
+			if (ack_timeout > slot * 3) {
 				m_sender_window.reset();
 			}
 			bool succ = m_sender_window.consume_one(packet);
@@ -184,8 +184,10 @@ public:
 					++ack_timeout;
 				if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
 					cur_ack = control.ack.load();
+					std::cerr << " Send ACK:   " << cur_ack << "\n";
 					gen_ack(cur_ack);
-				} else {
+				}
+				if (last_ack == cur_ack) {
 					return 0;
 				}
 			} else {
@@ -245,6 +247,7 @@ public:
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
+					std::cerr << "Ack commited\n";
 					if (++sent >= hold_limit) {
 						// yield
 						counter = (rand() % backoff + 2) * slot;

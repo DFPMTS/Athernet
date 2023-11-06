@@ -73,10 +73,11 @@ public:
 			if (mac_frame.to != config.get_self_id())
 				continue;
 
-			if (mac_frame.is_ack) {
+			if (mac_frame.has_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
 			}
-			control.ack.store(m_receiver_window.receive_packet(mac_frame.seq));
+			if (!mac_frame.is_ack)
+				control.ack.store(m_receiver_window.receive_packet(mac_frame.seq));
 		}
 	}
 

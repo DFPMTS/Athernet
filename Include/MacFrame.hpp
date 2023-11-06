@@ -31,7 +31,8 @@ struct MacFrame {
 		for (int i = 0; i < 8; ++i) {
 			ack += frame[i + 16] << i;
 		}
-		is_ack = frame[24];
+		has_ack = frame[24];
+		is_ack = frame[25];
 		std::copy(std::begin(frame) + 32, std::end(frame), std::back_inserter(data));
 	}
 	int from;
@@ -39,6 +40,7 @@ struct MacFrame {
 	int seq;
 	int ack;
 	int is_ack;
+	int has_ack;
 	std::vector<int> data;
 };
 
