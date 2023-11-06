@@ -65,12 +65,12 @@ public:
 
 			} else if (ack < window_start + config.get_window_size() - config.get_seq_limit()) {
 				accepted = true;
-				while (window.size() && window[0]->seq >= window_start) {
+				while (window.size() && window[0]->seq >= window_start && start > 0) {
 					window.discard(1);
+					--start;
 					if (++window_start >= config.get_seq_limit())
 						window_start -= config.get_seq_limit();
 				}
-				start = 0;
 			}
 		} else {
 			if (ack >= window_start && ack < window_start + config.get_window_size()) {
@@ -79,12 +79,12 @@ public:
 		}
 		if (accepted) {
 			std::cerr << "Got ack:  " << ack << "\n";
-			while (window.size() && window[0]->seq <= ack) {
+			while (window.size() && window[0]->seq <= ack && start > 0) {
 				window.discard(1);
+				--start;
 				if (++window_start >= config.get_seq_limit())
 					window_start -= config.get_seq_limit();
 			}
-			start = 0;
 			producer.notify_one();
 		}
 	}
