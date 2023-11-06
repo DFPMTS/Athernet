@@ -38,7 +38,6 @@ public:
 	void send_loop()
 	{
 		state = PhySendState::PROCESS_FRAME;
-		Signal signal;
 		std::vector<int> frame;
 		std::shared_ptr<PHY_Unit> phy_unit;
 		while (running.load()) {
@@ -84,26 +83,18 @@ public:
 		modulate_vec(length, signal);
 
 		Frame temp;
-		Frame to { 0, 0, 0, 0 };
+		Frame to { 1, 0, 0, 0 };
 		Frame from { 0, 0, 0, 0 };
 		Frame seq;
 		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
 		for (int i = 0; i < config.get_seq_bits_length(); ++i) {
-			if (seq_num & (1 << i)) {
-				seq.push_back(1);
-			} else {
-				seq.push_back(0);
-			}
+			seq.push_back((seq_num >> i) & 1);
 		}
 
 		Frame ack;
 		if (ack_num != -1) {
 			for (int i = 0; i < config.get_seq_bits_length(); ++i) {
-				if (ack_num & (1 << i)) {
-					ack.push_back(1);
-				} else {
-					ack.push_back(0);
-				}
+				ack.push_back((ack_num >> i) & 1);
 			}
 			control_section[0] = 1;
 		} else {
@@ -123,6 +114,50 @@ public:
 		modulate_vec(frame, signal);
 	}
 
+	void gen_ack(int ack_num)
+	{
+		signal.clear();
+		append_preamble(signal);
+		Frame length;
+		for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
+			if (32 & (1ULL << i)) {
+				length.push_back(1);
+			} else {
+				length.push_back(0);
+			}
+		}
+		modulate_vec(length, signal);
+
+		Frame temp;
+		Frame to { 1, 0, 0, 0 };
+		Frame from { 0, 0, 0, 0 };
+		Frame seq { 0, 0, 0, 0, 0, 0, 0, 0 };
+		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		control_section[1] = 1;
+		Frame ack;
+		if (ack_num != -1) {
+			for (int i = 0; i < config.get_seq_bits_length(); ++i) {
+				ack.push_back((ack_num >> i) & 1);
+			}
+			control_section[0] = 1;
+		} else {
+			ack = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		}
+
+		std::copy(std::begin(to), std::end(to), std::back_inserter(temp));
+		std::copy(std::begin(from), std::end(from), std::back_inserter(temp));
+		std::copy(std::begin(seq), std::end(seq), std::back_inserter(temp));
+		std::copy(std::begin(ack), std::end(ack), std::back_inserter(temp));
+		std::copy(std::begin(control_section), std::end(control_section), std::back_inserter(temp));
+
+		append_crc8(temp);
+
+		modulate_vec(temp, signal);
+		auto t = signal;
+		append_vec(t, signal);
+		append_vec(t, signal);
+	}
+
 	int pop_stream(float* buffer, int count)
 	{
 		static int counter = 0;
@@ -135,19 +170,28 @@ public:
 		static int has_ack = 0;
 		static int sent = 0;
 		static int hold_limit = 5;
-		static int timeout = 0;
+		static int ack_timeout = 0;
+		static int last_ack = -1;
+		static int cur_ack = -1;
 
 		if (!packet) {
-			if (timeout > 50) {
+			if (ack_timeout > slot * 2) {
 				m_sender_window.reset();
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
-				++timeout;
-				return 0;
+				++ack_timeout;
+				if (control.ack.load() != last_ack) {
+					cur_ack = control.ack.load();
+					gen_ack(cur_ack);
+				} else {
+					return 0;
+				}
+			} else {
+				ack_timeout = 0;
+				cur_ack = control.ack.load();
+				modulate(packet->frame, packet->seq, cur_ack);
 			}
-			timeout = 0;
-			modulate(packet->frame, packet->seq, control.ack.load());
 		}
 
 		// race begin
@@ -199,6 +243,7 @@ public:
 				if (start >= signal.size()) {
 					start = 0;
 					packet.reset();
+					last_ack = cur_ack;
 					if (++sent >= hold_limit) {
 						// yield
 						counter = (rand() % backoff + 2) * slot;

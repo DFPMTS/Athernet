@@ -70,6 +70,9 @@ public:
 			std::cerr << mac_frame.from << " --> " << mac_frame.to << "   " << mac_frame.seq << "  "
 					  << mac_frame.ack << "    " << mac_frame.is_ack << "\n";
 
+			if (mac_frame.to != config.get_self_id())
+				continue;
+
 			if (mac_frame.is_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
 			}
