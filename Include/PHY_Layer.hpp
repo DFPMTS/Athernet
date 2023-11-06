@@ -10,11 +10,11 @@ namespace Athernet {
 
 template <typename T> class PHY_Layer : public juce::AudioIODeviceCallback {
 public:
-	PHY_Layer(Protocol_Control& mac_control)
+	PHY_Layer(Protocol_Control& mac_control, MAC_Sender<T>& sender, MAC_Receiver<T>& receiver)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
-		, m_sender(mac_control)
-		, m_receiver(mac_control)
+		, m_sender { sender }
+		, m_receiver { receiver }
 	{
 		control.collision.store(false);
 	}
@@ -73,8 +73,8 @@ private:
 
 	Protocol_Control& control;
 
-	MAC_Receiver<T> m_receiver;
-	MAC_Sender<T> m_sender;
+	MAC_Receiver<T>& m_receiver;
+	MAC_Sender<T>& m_sender;
 
 	int windows_size = 32;
 };

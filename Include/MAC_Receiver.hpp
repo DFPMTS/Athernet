@@ -1,9 +1,12 @@
 #pragma once
 #include "Config.hpp"
 #include "LT_Decode.hpp"
+#include "MacFrame.hpp"
 #include "PHY_FrameExtractor.hpp"
 #include "Protocol_Control.hpp"
+#include "ReceiverSlidingWindow.hpp"
 #include "RingBuffer.hpp"
+#include "SenderSlidingWindow.hpp"
 #include "SyncQueue.hpp"
 #include <atomic>
 #include <cstring>
@@ -16,14 +19,18 @@ template <typename T> class MAC_Receiver {
 	using Frame = std::vector<int>;
 
 public:
-	MAC_Receiver(Protocol_Control& mac_control)
+	MAC_Receiver(Protocol_Control& mac_control, SyncQueue<Frame>& recv_queue,
+		SenderSlidingWindow& sender_window, ReceiverSlidingWindow& receiver_window)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
+		, m_recv_queue { recv_queue }
+		, m_sender_window { sender_window }
+		, m_receiver_window { receiver_window }
 		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue, mac_control)
 		, decoder(m_decoder_queue, m_recv_queue)
 	{
 		display_running.store(true);
-		display_worker = std::thread(&MAC_Receiver::display_frame, this);
+		display_worker = std::thread(&MAC_Receiver::forward_frame, this);
 	}
 
 	~MAC_Receiver()
@@ -47,61 +54,39 @@ public:
 		assert(result);
 	}
 
-	std::vector<Frame> pop_frame() { }
-
-	void display_frame()
+	void forward_frame()
 	{
 		Frame frame;
-		int file_id = 0;
+
 		while (display_running.load()) {
 			if (!m_recv_queue.pop(frame)) {
 				std::this_thread::yield();
 				continue;
 			}
-			if (frame.size() > 1000) {
-				int file_len = 0;
-				for (int i = 0; i < 16; ++i) {
-					file_len += (frame[i] << i);
-				}
+			std::cerr << "------------------------------GOT_---------------------------\n";
+			std::cerr << m_recv_queue.m_queue.size() << "\n";
+			MacFrame mac_frame(frame);
 
-				++file_id;
-				std::string file_name = NOTEBOOK_DIR + std::to_string(file_id) + ".txt";
-				auto fd = fopen(file_name.c_str(), "wc");
-				int data_start = 16;
-				for (int i = data_start; i < data_start + file_len; ++i) {
-					fprintf(fd, "%d", frame[i]);
-				}
-				fflush(fd);
-				fclose(fd);
-			} else if (frame.size() % 8 == 0) {
-				std::cerr << "------------------------------------------------------------\n";
-				std::cerr << "Interpreting as ASCII characters......\n";
-				for (int i = 0; i < frame.size(); i += 8) {
-					char c = 0;
-					for (int j = 0; j < 8; ++j) {
-						c += (char)((int)frame[i + j] << j);
-					}
-					putchar(c);
-				}
-				std::cerr << "\n";
-				std::cerr << "------------------------------------------------------------\n";
-			} else {
-				std::cerr << "Output as raw binary string:\n";
-				for (const auto& x : frame) {
-					std::cerr << x;
-				}
-				std::cerr << "\n";
+			std::cerr << mac_frame.from << " --> " << mac_frame.to << "   " << mac_frame.seq << "  "
+					  << mac_frame.ack << "    " << mac_frame.is_ack << "\n";
+
+			if (mac_frame.is_ack) {
+				m_sender_window.remove_acked(mac_frame.ack);
 			}
+			control.ack.store(m_receiver_window.receive_packet(mac_frame.seq));
 		}
 	}
 
 private:
-	Athernet::Config& config;
+	Config& config;
 	Protocol_Control& control;
-	Athernet::RingBuffer<T> m_recv_buffer;
-	Athernet::FrameExtractor<T> frame_extractor;
-	Athernet::SyncQueue<Frame> m_recv_queue;
-	Athernet::SyncQueue<Frame> m_decoder_queue;
+	SyncQueue<Frame>& m_recv_queue;
+	SenderSlidingWindow& m_sender_window;
+	ReceiverSlidingWindow& m_receiver_window;
+
+	RingBuffer<T> m_recv_buffer;
+	FrameExtractor<T> frame_extractor;
+	SyncQueue<Frame> m_decoder_queue;
 
 	LT_Decode decoder;
 

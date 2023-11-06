@@ -11,21 +11,21 @@ public:
 	void push(const T& item)
 	{
 		std::scoped_lock lock { mutex };
-		consumer.notify_one();
 		m_queue.push(item);
+		consumer.notify_one();
 	}
 
 	void push(T&& item)
 	{
 		std::scoped_lock lock { mutex };
-		consumer.notify_one();
 		m_queue.push(std::move(item));
+		consumer.notify_one();
 	}
 
 	bool pop(T& item)
 	{
 		std::unique_lock lock { mutex };
-		consumer.wait_for(lock, 100ms, [&]() { return !m_queue.empty(); });
+		// consumer.wait_for(lock, 100ms, [&]() { return !m_queue.empty(); });
 		if (!m_queue.empty()) {
 			item = std::move(m_queue.front());
 			m_queue.pop();
@@ -46,7 +46,7 @@ public:
 		}
 	}
 
-private:
+	// private:
 	std::queue<T> m_queue;
 	std::condition_variable consumer;
 	std::mutex mutex;

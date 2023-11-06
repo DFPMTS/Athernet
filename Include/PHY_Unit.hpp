@@ -5,15 +5,13 @@
 namespace Athernet {
 
 struct PHY_Unit {
-	PHY_Unit(std::vector<float>&& vec, int seq_num)
-		: signal { std::move(vec) }
-		, length { static_cast<int>(signal.size()) }
+	PHY_Unit(std::vector<int>&& vec, int seq_num)
+		: frame { std::move(vec) }
 		, seq { seq_num }
 	{
 	}
 
-	std::vector<float> signal;
-	int length;
+	std::vector<int> frame;
 	int seq;
 };
 

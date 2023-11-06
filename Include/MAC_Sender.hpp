@@ -4,6 +4,7 @@
 #include "PHY_Unit.hpp"
 #include "Protocol_Control.hpp"
 #include "RingBuffer.hpp"
+#include "SenderSlidingWindow.hpp"
 #include "SyncQueue.hpp"
 #include <mutex>
 #include <thread>
@@ -15,9 +16,10 @@ template <typename T> class MAC_Sender {
 	using Frame = std::vector<int>;
 
 public:
-	MAC_Sender(Protocol_Control& mac_control)
+	MAC_Sender(Protocol_Control& mac_control, SenderSlidingWindow& sender_window)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
+		, m_sender_window { sender_window }
 	{
 		running.store(true);
 		worker = std::thread(&MAC_Sender::send_loop, this);
@@ -47,27 +49,12 @@ public:
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
 
-				signal.clear();
-				append_preamble(signal);
-
-				assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
-				Frame length;
-				for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
-					if (frame.size() & (1ULL << i)) {
-						length.push_back(1);
-					} else {
-						length.push_back(0);
-					}
-				}
-				modulate_vec(length, signal);
-
-				append_crc8(frame);
-				modulate_vec(frame, signal);
+				int seq_num = m_sender_window.get_next_seq();
+				phy_unit = std::make_shared<PHY_Unit>(std::move(frame), seq_num);
 
 				state = PhySendState::SEND_SIGNAL;
-				phy_unit = std::make_shared<PHY_Unit>(std::move(signal), 0);
 			} else if (state == PhySendState::SEND_SIGNAL) {
-				if (!m_send_buffer.push(phy_unit)) {
+				if (!m_sender_window.try_push(phy_unit)) {
 					std::this_thread::yield();
 					continue;
 				} else {
@@ -78,6 +65,62 @@ public:
 				assert(0);
 			}
 		}
+	}
+
+	void modulate(Frame frame, int seq_num, int ack_num)
+	{
+		signal.clear();
+		append_preamble(signal);
+
+		assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
+		Frame length;
+		for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
+			if ((frame.size() + 32) & (1ULL << i)) {
+				length.push_back(1);
+			} else {
+				length.push_back(0);
+			}
+		}
+		modulate_vec(length, signal);
+
+		Frame temp;
+		Frame to { 0, 0, 0, 0 };
+		Frame from { 0, 0, 0, 0 };
+		Frame seq;
+		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		for (int i = 0; i < config.get_seq_bits_length(); ++i) {
+			if (seq_num & (1 << i)) {
+				seq.push_back(1);
+			} else {
+				seq.push_back(0);
+			}
+		}
+
+		Frame ack;
+		if (ack_num != -1) {
+			for (int i = 0; i < config.get_seq_bits_length(); ++i) {
+				if (ack_num & (1 << i)) {
+					ack.push_back(1);
+				} else {
+					ack.push_back(0);
+				}
+			}
+			control_section[0] = 1;
+		} else {
+			ack = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		}
+
+		std::copy(std::begin(to), std::end(to), std::back_inserter(temp));
+		std::copy(std::begin(from), std::end(from), std::back_inserter(temp));
+		std::copy(std::begin(seq), std::end(seq), std::back_inserter(temp));
+		std::copy(std::begin(ack), std::end(ack), std::back_inserter(temp));
+		std::copy(std::begin(control_section), std::end(control_section), std::back_inserter(temp));
+		std::swap(temp, frame);
+		std::copy(std::begin(temp), std::end(temp), std::back_inserter(frame));
+
+		append_crc8(frame);
+
+		modulate_vec(frame, signal);
 	}
 
 	int pop_stream(float* buffer, int count)
@@ -92,11 +135,19 @@ public:
 		static int has_ack = 0;
 		static int sent = 0;
 		static int hold_limit = 5;
+		static int timeout = 0;
 
 		if (!packet) {
-			bool succ = m_send_buffer.pop(&packet, 1);
-			if (!succ)
+			if (timeout > 50) {
+				m_sender_window.reset();
+			}
+			bool succ = m_sender_window.consume_one(packet);
+			if (!succ) {
+				++timeout;
 				return 0;
+			}
+			timeout = 0;
+			modulate(packet->frame, packet->seq, control.ack.load());
 		}
 
 		// race begin
@@ -111,8 +162,8 @@ public:
 					start = 0;
 					sent = 0;
 					int index = 0;
-					for (int i = start; index < count && i < packet->length; ++i, ++start) {
-						buffer[index++] = packet->signal[i];
+					for (int i = start; index < count && i < signal.size(); ++i, ++start) {
+						buffer[index++] = signal[i];
 					}
 					return index;
 				}
@@ -142,10 +193,10 @@ public:
 				return 0;
 			} else {
 				int index = 0;
-				for (int i = start; index < count && i < packet->length; ++i, ++start) {
-					buffer[index++] = packet->signal[i];
+				for (int i = start; index < count && i < signal.size(); ++i, ++start) {
+					buffer[index++] = signal[i];
 				}
-				if (start >= packet->length) {
+				if (start >= signal.size()) {
 					start = 0;
 					packet.reset();
 					if (++sent >= hold_limit) {
@@ -220,6 +271,10 @@ private:
 	}
 
 private:
+	Config& config;
+	SenderSlidingWindow& m_sender_window;
+	Protocol_Control& control;
+
 	enum class PhySendState { PROCESS_FRAME, SEND_SIGNAL, INVALID_STATE };
 	PhySendState state;
 	SyncQueue<Frame> m_send_queue;
@@ -227,12 +282,10 @@ private:
 	std::atomic_bool running;
 	RingBuffer<std::shared_ptr<PHY_Unit>> m_send_buffer;
 	RingBuffer<std::shared_ptr<PHY_Unit>> m_resend_buffer;
-	Config& config;
-
-	Protocol_Control& control;
 
 	Signal m_silence = Signal(10);
 	int start;
 	std::shared_ptr<PHY_Unit> packet;
+	Signal signal;
 };
 }
