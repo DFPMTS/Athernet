@@ -44,7 +44,7 @@ public:
 					continue;
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
-				// frame date is zero-padded to a fixed length
+
 				signal.clear();
 				append_preamble(signal);
 
@@ -62,7 +62,6 @@ public:
 				append_crc8(frame);
 				modulate_vec(frame, signal);
 
-				append_silence(signal);
 				state = PhySendState::SEND_SIGNAL;
 
 				m_packet_size.push(signal.size());
@@ -84,79 +83,85 @@ public:
 	{
 		static int counter = 0;
 
-		static int slice_limit = 5;
-		static int previledge_node = 0;
-		static int sending = 0;
-		static int slice_count = 0;
+		static int hold_channel = 0;
+		static int trying_channel = 0;
 		static int jammed = 0;
+		static int slot = 12;
+		static int backoff = 1;
+		static int has_ack = 0;
+		static int sent = 0;
+		static int hold_limit = 0;
 
-		if (previledge_node == config.get_self_id()) {
-			if (!packet_size) {
-				bool succ = m_packet_size.pop(&packet_size, 1);
-				if (!succ)
-					return 0;
-			}
-			if (!sending) {
-				if (control.busy.load()) {
-					// waiting
-					return 0;
-				} else {
-					sending = 1;
-				}
-				return 0;
-			} else {
-				if (control.collision.load()) {
-					// halt and jam
-					if (!jammed) {
-						start = 0;
-						sending = 0;
-						for (int i = 0; i < count; ++i) {
-							buffer[i] = (float)(50 + rand() % 50) / 100;
-						}
-						std::cerr << "Jamming\n";
-						jammed = 1;
+		// race begin
+		if (!hold_channel) {
+			if (!control.busy.load()) {
+				// race!
+				--counter;
+				if (counter < 0) {
+					// shoot!
+					hold_channel = 1;
+					jammed = 0;
+					start = 0;
+					sent = 0;
+					if (!packet_size) {
+						bool succ = m_packet_size.pop(&packet_size, 1);
+						if (!succ)
+							return 0;
 					}
-					return count;
-
-				} else {
-					if (jammed) {
-						previledge_node ^= 1;
-						return 0;
-					}
-					// continue transimitting
 					int size = m_send_buffer.size();
 					int index = 0;
 					for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
 						buffer[index++] = m_send_buffer[i];
 					}
-					if (start >= packet_size) {
-						m_send_buffer.discard(packet_size);
-						start = 0;
-						packet_size = 0;
-					}
 					return index;
 				}
+				return 0;
+			} else {
+				// wait
+				return 0;
 			}
 		} else {
-			static int released = 0, acquired = 0;
-			// shut up and get ready to take over
-			if (!control.busy.load() && released) {
-				// acquire
-				released = 0;
-				previledge_node ^= 1;
-				sending = 0;
-				jammed = 0;
-			}
-			if (control.collision.load() && !released) {
-				// halt and jam
-				sending = 0;
-				released = 1;
-				++slice_count;
-				std::cerr << "Clash!\n";
+			if (control.collision.load()) {
+				// collide!
+				hold_channel = 0;
+				if (has_ack) {
+					// ACK has the highest priority
+					counter = 0;
+				} else {
+					backoff <<= 1;
+					counter = (rand() % backoff + 1) * slot;
+				}
+				if (!jammed) {
+					for (int i = 0; i < count; ++i) {
+						buffer[i] = (float)(rand() % 50 + 50) / 100;
+					}
+					jammed = 1;
+					return count;
+				}
+				return 0;
 			} else {
-				acquired = 0;
+				if (!packet_size) {
+					bool succ = m_packet_size.pop(&packet_size, 1);
+					if (!succ)
+						return 0;
+				}
+				int size = m_send_buffer.size();
+				int index = 0;
+				for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
+					buffer[index++] = m_send_buffer[i];
+				}
+				if (start >= packet_size) {
+					m_send_buffer.discard(packet_size);
+					start = 0;
+					packet_size = 0;
+					backoff = 1;
+					if (++sent >= hold_limit) {
+						// yield
+						counter = slot;
+					}
+				}
+				return index;
 			}
-			return 0;
 		}
 	}
 
