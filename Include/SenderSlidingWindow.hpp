@@ -67,10 +67,10 @@ public:
 				accepted = true;
 				while (window.size() && window[0]->seq >= window_start) {
 					window.discard(1);
-					--start;
 					if (++window_start >= config.get_seq_limit())
 						window_start -= config.get_seq_limit();
 				}
+				start = 0;
 			}
 		} else {
 			if (ack >= window_start && ack < window_start + config.get_window_size()) {
@@ -81,10 +81,10 @@ public:
 			std::cerr << "Got ack:  " << ack << "\n";
 			while (window.size() && window[0]->seq <= ack) {
 				window.discard(1);
-				--start;
 				if (++window_start >= config.get_seq_limit())
 					window_start -= config.get_seq_limit();
 			}
+			start = 0;
 			producer.notify_one();
 		}
 	}
