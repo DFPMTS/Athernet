@@ -50,7 +50,7 @@ public:
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 3'000;
 			preamble_f2 = 15'000;
-			preamble_length = 80;
+			preamble_length = 64;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);

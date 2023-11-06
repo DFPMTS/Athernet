@@ -90,7 +90,7 @@ public:
 		static int backoff = 1;
 		static int has_ack = 0;
 		static int sent = 0;
-		static int hold_limit = 0;
+		static int hold_limit = 5;
 
 		// race begin
 		if (!hold_channel) {
@@ -124,7 +124,7 @@ public:
 			if (control.collision.load()) {
 				// collide!
 				hold_channel = 0;
-				if (has_ack) {
+				if (control.previlege_node != -1 && control.previlege_node != config.get_self_id()) {
 					// ACK has the highest priority
 					counter = 0;
 				} else {
