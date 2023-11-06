@@ -1,16 +1,16 @@
 #pragma once
 
 #include "JuceHeader.h"
-#include "MAC_Control.hpp"
 #include "PHY_Receiver.hpp"
 #include "PHY_Sender.hpp"
+#include "Protocol_Control.hpp"
 #include <atomic>
 
 namespace Athernet {
 
 template <typename T> class PHY_Layer : public juce::AudioIODeviceCallback {
 public:
-	PHY_Layer(MAC_Control& mac_control)
+	PHY_Layer(Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 		, m_sender(mac_control)
@@ -71,7 +71,7 @@ public:
 private:
 	Athernet::Config& config;
 
-	MAC_Control& control;
+	Protocol_Control& control;
 
 	Athernet::PHY_Receiver<T> m_receiver;
 	Athernet::PHY_Sender<T> m_sender;

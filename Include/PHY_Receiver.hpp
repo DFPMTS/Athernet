@@ -1,8 +1,8 @@
 #pragma once
 #include "Config.hpp"
 #include "LT_Decode.hpp"
-#include "MAC_Control.hpp"
 #include "PHY_FrameExtractor.hpp"
+#include "Protocol_Control.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <atomic>
@@ -16,7 +16,7 @@ template <typename T> class PHY_Receiver {
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Receiver(MAC_Control& mac_control)
+	PHY_Receiver(Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue, mac_control)
@@ -97,7 +97,7 @@ public:
 
 private:
 	Athernet::Config& config;
-	MAC_Control& control;
+	Protocol_Control& control;
 	Athernet::RingBuffer<T> m_recv_buffer;
 	Athernet::FrameExtractor<T> frame_extractor;
 	Athernet::SyncQueue<Frame> m_recv_queue;

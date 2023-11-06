@@ -1,5 +1,5 @@
 #include "Config.hpp"
-#include "MAC_Control.hpp"
+#include "Protocol_Control.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <atomic>
@@ -14,7 +14,7 @@ template <typename T> class FrameExtractor {
 
 public:
 	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue,
-		Athernet::SyncQueue<Frame>& decoder_queue, MAC_Control& mac_control)
+		Athernet::SyncQueue<Frame>& decoder_queue, Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, m_recv_buffer { recv_buffer }
 		, m_recv_queue { recv_queue }
@@ -400,7 +400,7 @@ private:
 	Athernet::RingBuffer<T>& m_recv_buffer;
 	Athernet::SyncQueue<Frame>& m_recv_queue;
 	Athernet::SyncQueue<Frame>& m_decoder_queue;
-	MAC_Control& control;
+	Protocol_Control& control;
 
 	std::thread worker;
 	std::atomic_bool running;

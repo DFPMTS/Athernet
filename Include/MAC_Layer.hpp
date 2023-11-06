@@ -1,8 +1,8 @@
 #pragma once
 
 #include "JuceHeader.h"
-#include "MAC_Control.hpp"
 #include "PHY_Layer.hpp"
+#include "Protocol_Control.hpp"
 #include <atomic>
 
 namespace Athernet {
@@ -32,7 +32,7 @@ public:
 		worker.join();
 	}
 
-	MAC_Control control;
+	Protocol_Control control;
 
 	PHY_Layer<float> phy_layer;
 

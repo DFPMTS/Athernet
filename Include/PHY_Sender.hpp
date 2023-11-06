@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Config.hpp"
-#include "MAC_Control.hpp"
 #include "PHY_Unit.hpp"
+#include "Protocol_Control.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <mutex>
@@ -15,7 +15,7 @@ template <typename T> class PHY_Sender {
 	using Frame = std::vector<int>;
 
 public:
-	PHY_Sender(MAC_Control& mac_control)
+	PHY_Sender(Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 	{
@@ -226,9 +226,12 @@ private:
 	std::thread worker;
 	std::atomic_bool running;
 	RingBuffer<std::shared_ptr<PHY_Unit>> m_send_buffer;
+	RingBuffer<std::shared_ptr<PHY_Unit>> m_resend_buffer;
+	enum class SendPacketState { ACKED, SENT, NOT_SENT };
+	enum class RecvPacketState { ACKED, RECEIVED, NOT_RECEIVED };
 	Config& config;
 
-	MAC_Control& control;
+	Protocol_Control& control;
 
 	Signal m_silence = Signal(10);
 	int start;
