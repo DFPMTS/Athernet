@@ -2,6 +2,7 @@
 
 #include "Config.hpp"
 #include "MAC_Control.hpp"
+#include "PHY_Unit.hpp"
 #include "RingBuffer.hpp"
 #include "SyncQueue.hpp"
 #include <mutex>
@@ -21,7 +22,7 @@ public:
 		running.store(true);
 		worker = std::thread(&PHY_Sender::send_loop, this);
 		start = 0;
-		packet_size = 0;
+		packet.reset();
 	}
 	~PHY_Sender()
 	{
@@ -37,6 +38,7 @@ public:
 		state = PhySendState::PROCESS_FRAME;
 		Signal signal;
 		std::vector<int> frame;
+		std::shared_ptr<PHY_Unit> phy_unit;
 		while (running.load()) {
 			if (state == PhySendState::PROCESS_FRAME) {
 				if (!m_send_queue.pop(frame)) {
@@ -63,10 +65,9 @@ public:
 				modulate_vec(frame, signal);
 
 				state = PhySendState::SEND_SIGNAL;
-
-				m_packet_size.push(signal.size());
+				phy_unit = std::make_shared<PHY_Unit>(std::move(signal), 0);
 			} else if (state == PhySendState::SEND_SIGNAL) {
-				if (!m_send_buffer.push(signal)) {
+				if (!m_send_buffer.push(phy_unit)) {
 					std::this_thread::yield();
 					continue;
 				} else {
@@ -92,6 +93,12 @@ public:
 		static int sent = 0;
 		static int hold_limit = 5;
 
+		if (!packet) {
+			bool succ = m_send_buffer.pop(&packet, 1);
+			if (!succ)
+				return 0;
+		}
+
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
@@ -103,15 +110,9 @@ public:
 					jammed = 0;
 					start = 0;
 					sent = 0;
-					if (!packet_size) {
-						bool succ = m_packet_size.pop(&packet_size, 1);
-						if (!succ)
-							return 0;
-					}
-					int size = m_send_buffer.size();
 					int index = 0;
-					for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
-						buffer[index++] = m_send_buffer[i];
+					for (int i = start; index < count && i < packet->length; ++i, ++start) {
+						buffer[index++] = packet->signal[i];
 					}
 					return index;
 				}
@@ -140,20 +141,13 @@ public:
 				}
 				return 0;
 			} else {
-				if (!packet_size) {
-					bool succ = m_packet_size.pop(&packet_size, 1);
-					if (!succ)
-						return 0;
-				}
-				int size = m_send_buffer.size();
 				int index = 0;
-				for (int i = start; i < size && index < count && i < packet_size; ++i, ++start) {
-					buffer[index++] = m_send_buffer[i];
+				for (int i = start; index < count && i < packet->length; ++i, ++start) {
+					buffer[index++] = packet->signal[i];
 				}
-				if (start >= packet_size) {
-					m_send_buffer.discard(packet_size);
+				if (start >= packet->length) {
 					start = 0;
-					packet_size = 0;
+					packet.reset();
 					if (++sent >= hold_limit) {
 						// yield
 						counter = (rand() % backoff + 2) * slot;
@@ -228,17 +222,16 @@ private:
 private:
 	enum class PhySendState { PROCESS_FRAME, SEND_SIGNAL, INVALID_STATE };
 	PhySendState state;
-	Athernet::SyncQueue<Frame> m_send_queue;
+	SyncQueue<Frame> m_send_queue;
 	std::thread worker;
 	std::atomic_bool running;
-	Athernet::RingBuffer<T> m_send_buffer;
-	RingBuffer<int> m_packet_size;
-	Athernet::Config& config;
+	RingBuffer<std::shared_ptr<PHY_Unit>> m_send_buffer;
+	Config& config;
 
 	MAC_Control& control;
 
 	Signal m_silence = Signal(10);
 	int start;
-	int packet_size;
+	std::shared_ptr<PHY_Unit> packet;
 };
 }
