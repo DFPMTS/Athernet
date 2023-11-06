@@ -181,7 +181,7 @@ public:
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
 				++ack_timeout;
-				if (control.ack.load() != last_ack) {
+				if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
 					cur_ack = control.ack.load();
 					gen_ack(cur_ack);
 				} else {
