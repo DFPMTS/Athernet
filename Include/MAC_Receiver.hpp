@@ -71,7 +71,7 @@ public:
 			std::cerr << "From: " << mac_frame.from << " --> "
 					  << "To: " << mac_frame.to << "\n"
 					  << "Seq: " << mac_frame.seq << "    Has ack:" << mac_frame.has_ack
-					  << "  Ack: " << mac_frame.has_ack << "\n";
+					  << "  Ack: " << mac_frame.ack << "\n";
 			std::cerr << "----------------------------------------------------------------------\n";
 			if (!mac_frame.bad_data)
 				control.previlege_node.store(mac_frame.from);
