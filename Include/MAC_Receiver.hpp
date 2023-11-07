@@ -72,7 +72,9 @@ public:
 
 			if (mac_frame.to != config.get_self_id())
 				continue;
-
+			if (mac_frame.is_ack)
+				std::cerr
+					<< "-------------------------------------ACK---------------------------------------\n";
 			if (mac_frame.has_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
 			}

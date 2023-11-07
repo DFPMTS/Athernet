@@ -120,7 +120,7 @@ public:
 		append_preamble(signal);
 		Frame length;
 		for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
-			if (32 & (1ULL << i)) {
+			if (34 & (1ULL << i)) {
 				length.push_back(1);
 			} else {
 				length.push_back(0);
@@ -149,7 +149,8 @@ public:
 		std::copy(std::begin(seq), std::end(seq), std::back_inserter(temp));
 		std::copy(std::begin(ack), std::end(ack), std::back_inserter(temp));
 		std::copy(std::begin(control_section), std::end(control_section), std::back_inserter(temp));
-
+		temp.push_back(0);
+		temp.push_back(0);
 		append_crc8(temp);
 
 		modulate_vec(temp, signal);
@@ -187,7 +188,7 @@ public:
 					std::cerr << " Send ACK:   " << cur_ack << "\n";
 					gen_ack(cur_ack);
 				}
-				if (last_ack == cur_ack) {
+				if (control.ack.load() == last_ack) {
 					return 0;
 				}
 			} else {
