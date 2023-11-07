@@ -85,6 +85,9 @@ public:
 		if (!packet) {
 			if (ack_timeout > slot * 3) {
 				m_sender_window.reset();
+				// std::cerr <<
+				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
+				// 			 "!!!!!!!!!!!!!!!!!!!!\n";
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
@@ -101,6 +104,11 @@ public:
 				}
 			} else {
 				ack_timeout = 0;
+				cur_ack = control.ack.load();
+				modulate(packet->frame, packet->seq, cur_ack);
+			}
+		} else {
+			if (!hold_channel && control.ack.load() != cur_ack) {
 				cur_ack = control.ack.load();
 				modulate(packet->frame, packet->seq, cur_ack);
 			}
