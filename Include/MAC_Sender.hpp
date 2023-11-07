@@ -83,7 +83,7 @@ public:
 		static int cur_ack = -1;
 
 		if (!packet) {
-			if (ack_timeout > slot * 3) {
+			if (ack_timeout > 2 * slot) {
 				m_sender_window.reset();
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -117,6 +117,10 @@ public:
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
+				if (control.ack.load() != last_ack && control.previlege_node.load() != config.get_self_id()) {
+					// ACK has the highest priority
+					counter = 0;
+				}
 				// race!
 				--counter;
 				if (counter < 0) {
@@ -140,13 +144,8 @@ public:
 			if (control.collision.load()) {
 				// collide!
 				hold_channel = 0;
-				if (control.ack.load() != last_ack && control.previlege_node.load() != config.get_self_id()) {
-					// ACK has the highest priority
-					counter = 0;
-				} else {
-					backoff <<= 1;
-					counter = (rand() % backoff + 1) * slot;
-				}
+				backoff <<= 1;
+				counter = (rand() % backoff + 1) * slot;
 				if (!jammed) {
 					for (int i = 0; i < count; ++i) {
 						buffer[i] = (float)(rand() % 50 + 50) / 100;

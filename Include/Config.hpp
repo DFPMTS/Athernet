@@ -196,7 +196,7 @@ public:
 
 	float get_collision_threshold() const { return 0.0005f; }
 
-	int get_window_size() const { return 8; }
+	int get_window_size() const { return 4; }
 
 	int get_seq_bits_length() const { return 8; }
 
