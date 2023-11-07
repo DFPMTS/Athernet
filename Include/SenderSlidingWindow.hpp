@@ -23,8 +23,6 @@ public:
 	{
 		std::scoped_lock lock { mutex };
 		int id = window_start + window.size();
-		std::cerr << window_start << " : start\n";
-		std::cerr << window.size() << " : size\n";
 		if (id >= config.get_seq_limit())
 			id -= config.get_seq_limit();
 		return id;
@@ -80,7 +78,6 @@ public:
 			}
 		}
 		if (accepted) {
-			std::cerr << "Got ack:  " << ack << "\n";
 			while (window.size() && window[0]->seq <= ack) {
 				window.discard(1);
 				--start;

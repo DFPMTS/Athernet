@@ -57,31 +57,38 @@ public:
 	void forward_frame()
 	{
 		MacFrame mac_frame;
-
+		int data_packet = 0;
 		while (display_running.load()) {
 			if (!m_recv_queue.pop(mac_frame)) {
 				std::this_thread::yield();
 				continue;
 			}
-			std::cerr << "------------------------------GOT_---------------------------\n";
+			if (!mac_frame.bad_data)
+				std::cerr << "-------------------------------GOT-DATA-------------------------------\n";
+			else
+				std::cerr << "------------------------------GOT-HEADER------------------------------\n";
 
-			std::cerr << mac_frame.from << " --> " << mac_frame.to << "   " << mac_frame.seq << "  "
-					  << mac_frame.ack << "    " << mac_frame.is_ack << "\n";
-
+			std::cerr << "From: " << mac_frame.from << " --> "
+					  << "To: " << mac_frame.to << "\n"
+					  << "Seq: " << mac_frame.seq << "    Has ack:" << mac_frame.has_ack
+					  << "  Ack: " << mac_frame.has_ack << "\n";
+			std::cerr << "----------------------------------------------------------------------\n";
 			if (!mac_frame.bad_data)
 				control.previlege_node.store(mac_frame.from);
 
 			if (mac_frame.to != config.get_self_id())
 				continue;
-			if (mac_frame.is_ack)
-				std::cerr
-					<< "-------------------------------------ACK---------------------------------------\n";
+
 			if (mac_frame.has_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
+			}
+			if (!mac_frame.bad_data) {
+				++data_packet;
 			}
 			if (!mac_frame.is_ack && !mac_frame.bad_data)
 				control.ack.store(m_receiver_window.receive_packet(mac_frame.seq));
 		}
+		std::cerr << "Total data packets:   " << data_packet << "\n";
 	}
 
 private:
