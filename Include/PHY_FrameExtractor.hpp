@@ -169,10 +169,10 @@ private:
 					}
 					good++;
 
-					// for (int i = 0; i < bits.size(); ++i) {
-					// 	std::cerr << bits[i];
-					// }
-					// std::cerr << "\n";
+					for (int i = 0; i < bits.size(); ++i) {
+						std::cerr << bits[i];
+					}
+					std::cerr << "\n";
 					// dispatch normal frame to recv_queue, and coded frame to decoder_queue
 					if (!bits[bits.size() - 1]) {
 						bits.pop_back();

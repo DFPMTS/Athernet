@@ -202,6 +202,9 @@ private:
 		} else {
 			append_num(0, 8, mac_frame);
 		}
+		// add control section
+		append_vec(control_section, mac_frame);
+
 		// add header
 		append_vec(frame, mac_frame);
 		// crc
@@ -238,6 +241,8 @@ private:
 		} else {
 			append_num(0, 8, mac_frame);
 		}
+		// add control section
+		append_vec(control_section, mac_frame);
 		// add header
 		append_vec(frame, mac_frame);
 		// crc
