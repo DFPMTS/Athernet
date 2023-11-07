@@ -146,7 +146,7 @@ private:
 				}
 				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
-				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 2) {
+				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 32) {
 					state = PhyRecvState::WAIT_HEADER;
 					// restore start
 					start = saved_start;
