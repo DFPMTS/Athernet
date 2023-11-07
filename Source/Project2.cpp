@@ -34,12 +34,6 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 		}
 		a.push_back(0);
 
-#ifdef WIN
-		a.push_back(0);
-#else
-		a.push_back(1);
-#endif
-
 		physical_layer->send_frame(a);
 		for (const auto& x : a)
 			fprintf(sent_fd, "%d\n", x);

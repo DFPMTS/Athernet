@@ -70,6 +70,8 @@ public:
 			std::cerr << mac_frame.from << " --> " << mac_frame.to << "   " << mac_frame.seq << "  "
 					  << mac_frame.ack << "    " << mac_frame.is_ack << "\n";
 
+			control.previlege_node.store(mac_frame.from);
+
 			if (mac_frame.to != config.get_self_id())
 				continue;
 			if (mac_frame.is_ack)

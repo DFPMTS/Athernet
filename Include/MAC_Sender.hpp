@@ -66,99 +66,6 @@ public:
 		}
 	}
 
-	void modulate(Frame frame, int seq_num, int ack_num)
-	{
-		signal.clear();
-		append_preamble(signal);
-
-		assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
-		Frame length;
-		for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
-			if ((frame.size() + 32) & (1ULL << i)) {
-				length.push_back(1);
-			} else {
-				length.push_back(0);
-			}
-		}
-		modulate_vec(length, signal);
-
-		Frame temp;
-		Frame to { 1, 0, 0, 0 };
-		Frame from { 0, 0, 0, 0 };
-		Frame seq;
-		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
-		for (int i = 0; i < config.get_seq_bits_length(); ++i) {
-			seq.push_back((seq_num >> i) & 1);
-		}
-
-		Frame ack;
-		if (ack_num != -1) {
-			for (int i = 0; i < config.get_seq_bits_length(); ++i) {
-				ack.push_back((ack_num >> i) & 1);
-			}
-			control_section[0] = 1;
-		} else {
-			ack = { 0, 0, 0, 0, 0, 0, 0, 0 };
-		}
-
-		std::copy(std::begin(to), std::end(to), std::back_inserter(temp));
-		std::copy(std::begin(from), std::end(from), std::back_inserter(temp));
-		std::copy(std::begin(seq), std::end(seq), std::back_inserter(temp));
-		std::copy(std::begin(ack), std::end(ack), std::back_inserter(temp));
-		std::copy(std::begin(control_section), std::end(control_section), std::back_inserter(temp));
-		std::swap(temp, frame);
-		std::copy(std::begin(temp), std::end(temp), std::back_inserter(frame));
-
-		append_crc8(frame);
-
-		modulate_vec(frame, signal);
-	}
-
-	void gen_ack(int ack_num)
-	{
-		signal.clear();
-		append_preamble(signal);
-		Frame length;
-		for (int i = 0; i < config.get_phy_frame_length_num_bits(); ++i) {
-			if (34 & (1ULL << i)) {
-				length.push_back(1);
-			} else {
-				length.push_back(0);
-			}
-		}
-		modulate_vec(length, signal);
-
-		Frame temp;
-		Frame to { 1, 0, 0, 0 };
-		Frame from { 0, 0, 0, 0 };
-		Frame seq { 0, 0, 0, 0, 0, 0, 0, 0 };
-		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
-		control_section[1] = 1;
-		Frame ack;
-		if (ack_num != -1) {
-			for (int i = 0; i < config.get_seq_bits_length(); ++i) {
-				ack.push_back((ack_num >> i) & 1);
-			}
-			control_section[0] = 1;
-		} else {
-			ack = { 0, 0, 0, 0, 0, 0, 0, 0 };
-		}
-
-		std::copy(std::begin(to), std::end(to), std::back_inserter(temp));
-		std::copy(std::begin(from), std::end(from), std::back_inserter(temp));
-		std::copy(std::begin(seq), std::end(seq), std::back_inserter(temp));
-		std::copy(std::begin(ack), std::end(ack), std::back_inserter(temp));
-		std::copy(std::begin(control_section), std::end(control_section), std::back_inserter(temp));
-		temp.push_back(0);
-		temp.push_back(0);
-		append_crc8(temp);
-
-		modulate_vec(temp, signal);
-		auto t = signal;
-		append_vec(t, signal);
-		append_vec(t, signal);
-	}
-
 	int pop_stream(float* buffer, int count)
 	{
 		static int counter = 0;
@@ -224,7 +131,7 @@ public:
 			if (control.collision.load()) {
 				// collide!
 				hold_channel = 0;
-				if (control.previlege_node != -1 && control.previlege_node != config.get_self_id()) {
+				if (control.ack.load() != last_ack) {
 					// ACK has the highest priority
 					counter = 0;
 				} else {
@@ -262,6 +169,83 @@ public:
 	}
 
 private:
+	void append_num(int num, int num_bits, Frame& frame)
+	{
+		for (int i = 0; i < num_bits; ++i) {
+			frame.push_back((num >> i) & 1);
+		}
+	}
+
+	void modulate(Frame frame, int seq_num, int ack_num)
+	{
+		signal.clear();
+		append_preamble(signal);
+
+		assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
+		Frame length;
+		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
+		modulate_vec(length, signal);
+
+		Frame mac_frame;
+		// to
+		append_num(config.get_self_id() ^ 1, 4, mac_frame);
+		// from
+		append_num(config.get_self_id(), 4, mac_frame);
+		// seq
+		append_num(seq_num, 8, mac_frame);
+		// control_section
+		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		// ack
+		if (ack_num != -1) {
+			append_num(ack_num, 8, mac_frame);
+			control_section[0] = 1;
+		} else {
+			append_num(0, 8, mac_frame);
+		}
+		// add header
+		append_vec(frame, mac_frame);
+		// crc
+		append_crc8(mac_frame);
+
+		modulate_vec(mac_frame, signal);
+	}
+
+	void gen_ack(int ack_num)
+	{
+		signal.clear();
+		append_preamble(signal);
+
+		Frame frame = { 0 };
+		Frame length;
+		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
+		modulate_vec(length, signal);
+
+		Frame mac_frame;
+		// to
+		append_num(config.get_self_id() ^ 1, 4, mac_frame);
+		// from
+		append_num(config.get_self_id(), 4, mac_frame);
+		// seq
+		append_num(0, 8, mac_frame);
+		// control_section
+		Frame control_section = { 0, 0, 0, 0, 0, 0, 0, 0 };
+		// is ack
+		control_section[1] = 1;
+		// ack
+		if (ack_num != -1) {
+			append_num(ack_num, 8, mac_frame);
+			control_section[0] = 1;
+		} else {
+			append_num(0, 8, mac_frame);
+		}
+		// add header
+		append_vec(frame, mac_frame);
+		// crc
+		append_crc8(mac_frame);
+
+		modulate_vec(mac_frame, signal);
+	}
+
 	void append_preamble(Signal& signal) { append_vec(config.get_preamble(Athernet::Tag<T>()), signal); }
 
 	void modulate_vec(const Frame& frame, Signal& signal)
@@ -315,7 +299,7 @@ private:
 
 	void append_silence(Signal& signal) { append_vec(m_silence, signal); }
 
-	void append_vec(const Signal& from, Signal& to)
+	template <typename U> void append_vec(const std::vector<U>& from, std::vector<U>& to)
 	{
 		std::copy(std::begin(from), std::end(from), std::back_inserter(to));
 	}

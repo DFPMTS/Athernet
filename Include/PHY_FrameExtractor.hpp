@@ -169,8 +169,6 @@ private:
 					}
 					good++;
 
-					control.previlege_node.store(bits[bits.size() - 1]);
-					bits.pop_back();
 					// for (int i = 0; i < bits.size(); ++i) {
 					// 	std::cerr << bits[i];
 					// }
