@@ -13,7 +13,7 @@ template <typename T> class FrameExtractor {
 	using Frame = std::vector<int>;
 
 public:
-	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<Frame>& recv_queue,
+	FrameExtractor(Athernet::RingBuffer<T>& recv_buffer, Athernet::SyncQueue<MacFrame>& recv_queue,
 		Athernet::SyncQueue<Frame>& decoder_queue, Protocol_Control& mac_control)
 		: config { Athernet::Config::get_instance() }
 		, m_recv_buffer { recv_buffer }
@@ -158,35 +158,40 @@ private:
 
 				bits.clear();
 				// collect data and crc residual
-				symbols_to_collect = payload_length + config.get_crc_residual_length();
+				symbols_to_collect
+					= payload_length + config.get_crc_residual_length() + config.get_crc_residual_length();
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::CHECK_PAYLOAD;
 			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
-				if (crc_check(bits)) {
-					// good to go
-					for (int i = 0; i < config.get_crc_residual_length(); ++i) {
-						bits.pop_back();
-					}
-					good++;
+				if (crc_check(bits, 0, 32 + config.get_crc_residual_length())) {
+					// good header
+					if (crc_check(bits, 32 + config.get_crc_residual_length(), bits.size())) {
+						// good to go
+						for (int i = 0; i < config.get_crc_residual_length(); ++i) {
+							bits.pop_back();
+						}
+						good++;
 
-					for (int i = 0; i < bits.size(); ++i) {
-						std::cerr << bits[i];
-					}
-					std::cerr << "\n";
-					// dispatch normal frame to recv_queue, and coded frame to decoder_queue
-					if (!bits[bits.size() - 1]) {
-						bits.pop_back();
-						m_recv_queue.push(std::move(bits));
+						// dispatch normal frame to recv_queue, and coded frame to decoder_queue
+						if (!bits[bits.size() - 1]) {
+							bits.pop_back();
+							MacFrame frame(bits, 0);
+							m_recv_queue.push(std::move(frame));
 
+						} else {
+							bits.pop_back();
+							m_decoder_queue.push(std::move(bits));
+						}
 					} else {
-						bits.pop_back();
-						m_decoder_queue.push(std::move(bits));
+						// discard
+						// std::cerr << "                                    ";
+						// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad
+						// frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+						MacFrame frame(bits, 1);
+						m_recv_queue.push(std::move(frame));
+						start = saved_start;
 					}
-
 				} else {
-					// discard
-					// std::cerr << "                                    ";
-					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 
@@ -213,9 +218,9 @@ private:
 		}
 	}
 
-	bool crc_check(Bits bits)
+	bool crc_check(Bits bits, int start, int end)
 	{
-		for (int i = 0; i < bits.size() - config.get_crc_residual_length(); ++i) {
+		for (int i = start; i < end - config.get_crc_residual_length(); ++i) {
 			if (bits[i]) {
 				for (int j = 0; j < config.get_crc_length(); ++j) {
 					bits[i + j] ^= config.get_crc()[j];
@@ -224,8 +229,7 @@ private:
 		}
 
 		bool is_zero = true;
-		for (int i = static_cast<int>(bits.size()) - config.get_crc_residual_length();
-			 i < static_cast<int>(bits.size()); ++i) {
+		for (int i = end - config.get_crc_residual_length(); i < end; ++i) {
 			if (bits[i]) {
 				is_zero = false;
 			}
@@ -399,7 +403,7 @@ private:
 
 	Athernet::Config& config;
 	Athernet::RingBuffer<T>& m_recv_buffer;
-	Athernet::SyncQueue<Frame>& m_recv_queue;
+	Athernet::SyncQueue<MacFrame>& m_recv_queue;
 	Athernet::SyncQueue<Frame>& m_decoder_queue;
 	Protocol_Control& control;
 

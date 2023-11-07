@@ -19,7 +19,7 @@ template <typename T> class MAC_Receiver {
 	using Frame = std::vector<int>;
 
 public:
-	MAC_Receiver(Protocol_Control& mac_control, SyncQueue<Frame>& recv_queue,
+	MAC_Receiver(Protocol_Control& mac_control, SyncQueue<MacFrame>& recv_queue,
 		SenderSlidingWindow& sender_window, ReceiverSlidingWindow& receiver_window)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
@@ -27,7 +27,7 @@ public:
 		, m_sender_window { sender_window }
 		, m_receiver_window { receiver_window }
 		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue, mac_control)
-		, decoder(m_decoder_queue, m_recv_queue)
+	// , decoder(m_decoder_queue, m_recv_queue)
 	{
 		display_running.store(true);
 		display_worker = std::thread(&MAC_Receiver::forward_frame, this);
@@ -56,16 +56,14 @@ public:
 
 	void forward_frame()
 	{
-		Frame frame;
+		MacFrame mac_frame;
 
 		while (display_running.load()) {
-			if (!m_recv_queue.pop(frame)) {
+			if (!m_recv_queue.pop(mac_frame)) {
 				std::this_thread::yield();
 				continue;
 			}
 			std::cerr << "------------------------------GOT_---------------------------\n";
-			std::cerr << m_recv_queue.m_queue.size() << "\n";
-			MacFrame mac_frame(frame);
 
 			std::cerr << mac_frame.from << " --> " << mac_frame.to << "   " << mac_frame.seq << "  "
 					  << mac_frame.ack << "    " << mac_frame.is_ack << "\n";
@@ -80,7 +78,7 @@ public:
 			if (mac_frame.has_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
 			}
-			if (!mac_frame.is_ack)
+			if (!mac_frame.is_ack && !mac_frame.bad_data)
 				control.ack.store(m_receiver_window.receive_packet(mac_frame.seq));
 		}
 	}
@@ -88,7 +86,7 @@ public:
 private:
 	Config& config;
 	Protocol_Control& control;
-	SyncQueue<Frame>& m_recv_queue;
+	SyncQueue<MacFrame>& m_recv_queue;
 	SenderSlidingWindow& m_sender_window;
 	ReceiverSlidingWindow& m_receiver_window;
 
@@ -96,7 +94,7 @@ private:
 	FrameExtractor<T> frame_extractor;
 	SyncQueue<Frame> m_decoder_queue;
 
-	LT_Decode decoder;
+	// LT_Decode decoder;
 
 	std::atomic_bool display_running;
 	std::thread display_worker;

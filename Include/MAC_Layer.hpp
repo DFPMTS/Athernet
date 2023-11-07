@@ -31,7 +31,7 @@ public:
 	}
 
 	Protocol_Control control;
-	SyncQueue<Frame> m_recv_queue;
+	SyncQueue<MacFrame> m_recv_queue;
 
 	MAC_Sender<float> m_sender;
 	MAC_Receiver<float> m_receiver;

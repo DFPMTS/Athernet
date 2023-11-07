@@ -96,6 +96,7 @@ public:
 					gen_ack(cur_ack);
 				}
 				if (control.ack.load() == last_ack) {
+					hold_channel = 0;
 					return 0;
 				}
 			} else {
@@ -131,7 +132,7 @@ public:
 			if (control.collision.load()) {
 				// collide!
 				hold_channel = 0;
-				if (control.ack.load() != last_ack) {
+				if (control.ack.load() != last_ack && control.previlege_node.load() != config.get_self_id()) {
 					// ACK has the highest priority
 					counter = 0;
 				} else {
@@ -204,11 +205,12 @@ private:
 		}
 		// add control section
 		append_vec(control_section, mac_frame);
-
-		// add header
-		append_vec(frame, mac_frame);
-		// crc
+		// crc for mac header
 		append_crc8(mac_frame);
+		// crc for payload
+		append_crc8(frame);
+		// add payload
+		append_vec(frame, mac_frame);
 
 		modulate_vec(mac_frame, signal);
 	}
@@ -243,11 +245,16 @@ private:
 		}
 		// add control section
 		append_vec(control_section, mac_frame);
-		// add header
-		append_vec(frame, mac_frame);
-		// crc
+		// crc for mac header
 		append_crc8(mac_frame);
+		// crc for payload
+		append_crc8(frame);
+		// add payload
+		append_vec(frame, mac_frame);
 
+		modulate_vec(mac_frame, signal);
+		modulate_vec(mac_frame, signal);
+		modulate_vec(mac_frame, signal);
 		modulate_vec(mac_frame, signal);
 	}
 

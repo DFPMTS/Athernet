@@ -9,13 +9,23 @@ using Frame = std::vector<int>;
 
 struct MacFrame {
 
-	MacFrame(const Frame& frame)
+	MacFrame()
+		: from { -1 }
+		, to { -1 }
+		, seq { -1 }
+		, ack { -1 }
+		, bad_data { -1 }
+	{
+	}
+
+	MacFrame(const Frame& frame, int is_bad_data)
 		: from { 0 }
 		, to { 0 }
 		, seq { 0 }
 		, ack { 0 }
+		, bad_data { is_bad_data }
 	{
-		assert(frame.size() >= 24);
+		assert(frame.size() >= 32);
 
 		for (int i = 0; i < 4; ++i) {
 			to += frame[i] << i;
@@ -31,9 +41,14 @@ struct MacFrame {
 		for (int i = 0; i < 8; ++i) {
 			ack += frame[i + 16] << i;
 		}
+
 		has_ack = frame[24];
 		is_ack = frame[25];
-		std::copy(std::begin(frame) + 32, std::end(frame), std::back_inserter(data));
+		if (!bad_data) {
+			for (int i = 32 + 8; i < frame.size(); ++i) {
+				data.push_back(i);
+			}
+		}
 	}
 	int from;
 	int to;
@@ -41,6 +56,7 @@ struct MacFrame {
 	int ack;
 	int is_ack;
 	int has_ack;
+	int bad_data;
 	std::vector<int> data;
 };
 
