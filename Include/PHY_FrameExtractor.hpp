@@ -80,7 +80,7 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_large_small(dot_product_square, 2, Tag<T>()),
+					if (greater_than(mul_large_small(dot_product_square, 3, Tag<T>()),
 							preamble_received_energy_product, Tag<T>())) {
 						if (dot_product > max_val) {
 							max_val = dot_product;
@@ -110,7 +110,7 @@ private:
 				if (confirmed) {
 					received++;
 					m_recv_buffer.discard(max_pos + config.get_preamble_length());
-					// std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
+					std::cerr << "head>  " << m_recv_buffer.show_head() << "\n";
 					start = 0;
 					saved_start = 0;
 					max_pos = -1;
@@ -130,12 +130,12 @@ private:
 			} else if (state == PhyRecvState::GET_LENGTH) {
 				bits.clear();
 				symbols_to_collect = config.get_phy_frame_length_num_bits();
-
+				start += 2;
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::GET_PAYLOAD;
 			} else if (state == PhyRecvState::GET_PAYLOAD) {
 				static int counter = 0;
-				// std::cerr << "Begin Get Data" << (++counter) << "\n";
+				std::cerr << "Begin Get Data" << (++counter) << "\n";
 
 				// move to length
 				std::swap(length, bits);
@@ -144,7 +144,7 @@ private:
 					if (length[i])
 						payload_length += (1 << i);
 				}
-				// std::cerr << "Length: " << payload_length << "\n";
+				std::cerr << "Length: " << payload_length << "\n";
 				// discard bad frame
 				if (payload_length > config.get_phy_frame_payload_symbol_limit() || payload_length < 32) {
 					state = PhyRecvState::WAIT_HEADER;
@@ -160,9 +160,14 @@ private:
 				// collect data and crc residual
 				symbols_to_collect
 					= payload_length + config.get_crc_residual_length() + config.get_crc_residual_length();
+				std::cerr << "Get Payload\n";
+				start += 2;
 				state = PhyRecvState::COLLECT_BITS;
 				next_state = PhyRecvState::CHECK_PAYLOAD;
 			} else if (state == PhyRecvState::CHECK_PAYLOAD) {
+				for (auto x : bits)
+					std::cerr << x;
+				std::cerr << "\n";
 				if (crc_check(bits, 0, 32 + config.get_crc_residual_length())) {
 					// good header
 					if (crc_check(bits, 32 + config.get_crc_residual_length(), bits.size())) {
@@ -203,7 +208,7 @@ private:
 				if (!symbols_to_collect) {
 					state = next_state;
 				} else {
-					symbols_to_collect -= to_bits(symbols_to_collect, bits);
+					symbols_to_collect -= to_bits_4b5b(symbols_to_collect, bits);
 					if (symbols_to_collect) {
 						std::this_thread::yield();
 					}
@@ -265,6 +270,32 @@ private:
 			}
 		}
 
+		return converted_count;
+	}
+
+	int to_bits_4b5b(int count, Bits& bits)
+	{
+		// std::cerr << "In -> \n";
+		int rightmost_pos = m_recv_buffer.size() - 9;
+		int converted_count = 0;
+		for (int i = start; i < rightmost_pos && converted_count < count; i += 10, start += 10) {
+			float val[6] = { m_recv_buffer[i - 2] + m_recv_buffer[i - 1],
+				m_recv_buffer[i] + m_recv_buffer[i + 1], m_recv_buffer[i + 2] + m_recv_buffer[i + 3],
+				m_recv_buffer[i + 4] + m_recv_buffer[i + 5], m_recv_buffer[i + 6] + m_recv_buffer[i + 7],
+				m_recv_buffer[i + 8] + m_recv_buffer[i + 9] };
+			int y = 0;
+			for (int j = 0; j < 5; ++j) {
+				y += (int)(val[j] * val[j + 1] < 0) << j;
+			}
+			int x = config.get_map_5b_4b(y);
+			for (int j = 0; j < 4; ++j) {
+				bits.push_back((x >> j) & 1);
+				++converted_count;
+				if (converted_count >= count)
+					break;
+			}
+		}
+		// std::cerr << " <- Out\n";
 		return converted_count;
 	}
 

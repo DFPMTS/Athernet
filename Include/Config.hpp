@@ -50,7 +50,7 @@ public:
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 3'000;
 			preamble_f2 = 15'000;
-			preamble_length = 64;
+			preamble_length = 128;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -194,13 +194,26 @@ public:
 #endif
 	}
 
-	float get_collision_threshold() const { return 0.0005f; }
+	// float get_collision_threshold() const { return 0.0005f; }
+	float get_collision_threshold() const { return 0.5; }
 
 	int get_window_size() const { return 4; }
 
 	int get_seq_bits_length() const { return 8; }
 
 	int get_seq_limit() const { return 1 << get_seq_bits_length(); }
+
+	int get_map_4b_5b(int x)
+	{
+		assert(x >= 0 && x < 16);
+		return map_4b_5b[x];
+	}
+
+	int get_map_5b_4b(int x)
+	{
+		assert(x >= 0 && x < 32);
+		return map_5b_4b[x];
+	}
 
 private:
 	int bit_rate;
@@ -222,6 +235,42 @@ private:
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
+
+	int map_4b_5b[16] = { 30, 9, 20, 21, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 28, 29 };
+	int map_5b_4b[32] = {
+		/* 00000 Q */ -1,
+		/* 00001 ? */ -1,
+		/* 00010 ? */ -1,
+		/* 00011 ? */ -1,
+		/* 00100 H */ -1,
+		/* 00101 ? */ -1,
+		/* 00110 L */ -1,
+		/* 00111 R */ -1,
+		/* 01000 ? */ -1,
+		/* 01001 1 */ 1,
+		/* 01010 4 */ 4,
+		/* 01011 5 */ 5,
+		/* 01100 ? */ -1,
+		/* 01101 T */ -1,
+		/* 01110 6 */ 6,
+		/* 01111 7 */ 7,
+		/* 10000 ? */ -1,
+		/* 10001 K */ -1,
+		/* 10010 8 */ 8,
+		/* 10011 9 */ 9,
+		/* 10100 2 */ 2,
+		/* 10101 3 */ 3,
+		/* 10110 A */ 10,
+		/* 10111 B */ 11,
+		/* 11000 J */ -1,
+		/* 11001 S */ -1,
+		/* 11010 C */ 12,
+		/* 11011 D */ 13,
+		/* 11100 E */ 14,
+		/* 11101 F */ 15,
+		/* 11110 0 */ 0,
+		/* 11111 I */ -1
+	};
 
 	std::vector<std::vector<std::vector<float>>> carriers;
 	std::vector<std::vector<std::vector<int>>> carriers_int;

@@ -25,7 +25,7 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 	for (int i = 0; i < num_packets; ++i) {
 		std::vector<int> a;
 		for (int j = 0; j < packet_length; ++j) {
-			// a.push_back(rand() % 2);
+// a.push_back(rand() % 2);
 #ifdef WIN
 			a.push_back(0);
 #else
@@ -96,6 +96,13 @@ void* Project2_main_loop(void*)
 	auto physical_layer = &mac_layer->phy_layer;
 
 	adm.addAudioCallback(physical_layer);
+
+	random_test(physical_layer, 1, 500);
+
+	// for (int i = 0; i < 16; ++i) {
+	// 	int y = Athernet::Config::get_instance().get_map_4b_5b(i);
+	// 	std::cerr << i << " -> " << y << " -> " << Athernet::Config::get_instance().get_map_5b_4b(y) << "\n";
+	// }
 
 	std::string s;
 	while (true) {

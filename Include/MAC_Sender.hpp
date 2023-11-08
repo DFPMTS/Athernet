@@ -200,7 +200,7 @@ private:
 		assert(frame.size() < (1ULL << config.get_phy_frame_length_num_bits()));
 		Frame length;
 		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
-		modulate_vec(length, signal);
+		modulate_vec_4b5b_nrzi(length, signal);
 
 		Frame mac_frame;
 		// to
@@ -227,7 +227,8 @@ private:
 		// add payload
 		append_vec(frame, mac_frame);
 
-		modulate_vec(mac_frame, signal);
+		// modulate_vec(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
 	}
 
 	void gen_ack(int ack_num)
@@ -238,7 +239,7 @@ private:
 		Frame frame = { 0 };
 		Frame length;
 		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
-		modulate_vec(length, signal);
+		modulate_vec_4b5b_nrzi(length, signal);
 
 		Frame mac_frame;
 		// to
@@ -267,13 +268,50 @@ private:
 		// add payload
 		append_vec(frame, mac_frame);
 
-		modulate_vec(mac_frame, signal);
-		modulate_vec(mac_frame, signal);
-		modulate_vec(mac_frame, signal);
-		modulate_vec(mac_frame, signal);
+		// modulate_vec(mac_frame, signal);
+		// modulate_vec(mac_frame, signal);
+		// modulate_vec(mac_frame, signal);
+		// modulate_vec(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
 	}
 
 	void append_preamble(Signal& signal) { append_vec(config.get_preamble(Athernet::Tag<T>()), signal); }
+
+	Frame encode_4b5b(const Frame& frame)
+	{
+		Frame ret;
+		for (int i = 0; i < frame.size(); i += 4) {
+			int x = 0;
+			for (int j = 0; j < 4; ++j) {
+				int bit = (i + j < frame.size()) ? frame[i + j] : 0;
+				x += bit << j;
+			}
+			int y = config.get_map_4b_5b(x);
+			for (int j = 0; j < 5; ++j) {
+				ret.push_back((y >> j) & 1);
+			}
+		}
+		return ret;
+	}
+
+	void modulate_vec_4b5b_nrzi(const Frame& frame, Signal& signal)
+	{
+		float last = 1.0f;
+		signal.push_back(last);
+		signal.push_back(last);
+		auto encoded_4b5b = encode_4b5b(frame);
+		std::cerr << frame.size() << "mapped to " << encoded_4b5b.size() << "\n";
+		for (auto x : encoded_4b5b) {
+			if (x == 1) {
+				last = -last;
+			}
+			signal.push_back(last);
+			signal.push_back(last);
+		}
+	}
 
 	void modulate_vec(const Frame& frame, Signal& signal)
 	{
