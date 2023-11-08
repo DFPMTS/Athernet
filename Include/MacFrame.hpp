@@ -46,7 +46,7 @@ struct MacFrame {
 		is_ack = frame[25];
 		if (!bad_data) {
 			for (int i = 32 + 8; i < frame.size(); ++i) {
-				data.push_back(i);
+				data.push_back(frame[i]);
 			}
 		}
 	}
