@@ -80,7 +80,7 @@ private:
 					auto preamble_received_energy_product
 						= mul_large(config.get_preamble_energy(Tag<T>()), received_energy, Tag<T>());
 
-					if (greater_than(mul_large_small(dot_product_square, 3, Tag<T>()),
+					if (greater_than(mul_large_small(dot_product_square, 2, Tag<T>()),
 							preamble_received_energy_product, Tag<T>())) {
 						if (dot_product > max_val) {
 							max_val = dot_product;
