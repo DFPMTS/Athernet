@@ -276,6 +276,10 @@ private:
 		modulate_vec_4b5b_nrzi(mac_frame, signal);
 		modulate_vec_4b5b_nrzi(mac_frame, signal);
 		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
 	}
 
 	void append_preamble(Signal& signal) { append_vec(config.get_preamble(Athernet::Tag<T>()), signal); }

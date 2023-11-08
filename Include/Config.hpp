@@ -194,8 +194,8 @@ public:
 #endif
 	}
 
-	// float get_collision_threshold() const { return 0.0005f; }
-	float get_collision_threshold() const { return 0.5; }
+	float get_collision_threshold() const { return 0.0005f; }
+	// float get_collision_threshold() const { return 0.5; }
 
 	int get_window_size() const { return 4; }
 
