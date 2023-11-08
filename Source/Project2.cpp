@@ -97,7 +97,7 @@ void* Project2_main_loop(void*)
 
 	adm.addAudioCallback(physical_layer);
 
-	random_test(physical_layer, 1, 500);
+	// random_test(physical_layer, 1, 500);
 
 	// for (int i = 0; i < 16; ++i) {
 	// 	int y = Athernet::Config::get_instance().get_map_4b_5b(i);

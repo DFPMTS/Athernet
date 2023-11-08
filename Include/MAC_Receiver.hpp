@@ -63,7 +63,7 @@ public:
 				std::this_thread::yield();
 				continue;
 			}
-			if (!mac_frame.bad_data)
+			if (!mac_frame.bad_data && !mac_frame.is_ack)
 				std::cerr << "-------------------------------GOT-DATA-------------------------------\n";
 			else
 				std::cerr << "------------------------------GOT-HEADER------------------------------\n";

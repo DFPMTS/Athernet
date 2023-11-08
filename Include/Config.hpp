@@ -50,7 +50,7 @@ public:
 			// * Preamble (chirp) Parameters
 			preamble_f1 = 3'000;
 			preamble_f2 = 15'000;
-			preamble_length = 128;
+			preamble_length = 64;
 			// * -------------------
 
 			assert(preamble_length % 2 == 0);
@@ -230,8 +230,8 @@ private:
 
 	int phy_frame_CP_length;
 
-	int phy_frame_payload_symbol_limit = 1000;
-	int phy_frame_length_num_bits = 10;
+	int phy_frame_payload_symbol_limit = 4095;
+	int phy_frame_length_num_bits = 12;
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
