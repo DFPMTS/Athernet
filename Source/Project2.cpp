@@ -122,10 +122,12 @@ void* Project2_main_loop(void*)
 	}
 	fclose(fd);
 	std::cerr << text.size() << "\n";
-	for (int i = 0; i < text.size(); i += 500) {
+	int packet_size = 0;
+	std::cin >> packet_size;
+	for (int i = 0; i < text.size(); i += packet_size) {
 		Athernet::Frame a;
-		for (int j = 0; j < 500; ++j) {
-			a.push_back(text[i + j]);
+		for (int j = 0; j < packet_size; ++j) {
+			a.push_back((i + j < text.size()) ? text[i + j] : 0);
 		}
 		a.push_back(0);
 		physical_layer->send_frame(a);

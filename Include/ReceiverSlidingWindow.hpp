@@ -48,7 +48,7 @@ public:
 				window[window_start] = 0;
 				std::copy(std::begin(packets[window_start]), std::end(packets[window_start]),
 					std::back_inserter(stream));
-				++collected;
+				collected += packets[window_start].size();
 				if (++window_start >= config.get_seq_limit())
 					window_start -= config.get_seq_limit();
 			}

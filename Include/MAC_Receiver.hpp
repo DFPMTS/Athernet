@@ -87,7 +87,7 @@ public:
 			}
 			if (!mac_frame.is_ack && !mac_frame.bad_data)
 				control.ack.store(m_receiver_window.receive_packet(mac_frame.data, mac_frame.seq));
-			if (m_receiver_window.get_num_collected() == 100) {
+			if (m_receiver_window.get_num_collected() >= 50000) {
 				std::cerr << "----------------------------------------File "
 							 "Received!----------------------------------------\n";
 				config.timer_get();
