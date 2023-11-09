@@ -104,6 +104,32 @@ void* Project2_main_loop(void*)
 	// 	std::cerr << i << " -> " << y << " -> " << Athernet::Config::get_instance().get_map_5b_4b(y) << "\n";
 	// }
 
+	std::string file = "INPUT.bin";
+	int c;
+	std::vector<int> text;
+
+	file = NOTEBOOK_DIR + file;
+	auto fd = fopen(file.c_str(), "r");
+	if (!fd) {
+		std::cerr << "File not found!\n";
+		assert(0);
+	}
+	while ((c = fgetc(fd)) != EOF) {
+		for (int i = 0; i < 8; ++i) {
+			text.push_back((c >> i) & 1);
+		}
+	}
+	fclose(fd);
+
+	for (int i = 0; i < text.size(); i += 500) {
+		Athernet::Frame a;
+		for (int j = 0; j < 500; ++j) {
+			a.push_back(text[i + j]);
+		}
+		a.push_back(0);
+		physical_layer->send_frame(a);
+	}
+
 	std::string s;
 	while (true) {
 		std::cin >> s;
