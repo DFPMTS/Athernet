@@ -95,7 +95,7 @@ public:
 					++ack_timeout;
 				if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
 					cur_ack = control.ack.load();
-					std::cerr << " Send ACK:   " << cur_ack << "\n";
+					// std::cerr << " Send ACK:   " << cur_ack << "\n";
 					gen_ack(cur_ack);
 				}
 				if (control.ack.load() == last_ack) {
@@ -171,7 +171,7 @@ public:
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
-					std::cerr << "Ack commited\n";
+					// std::cerr << "Ack commited\n";
 					if (++sent >= hold_limit) {
 						// yield
 						counter = (rand() % backoff + 2) * slot;
@@ -307,7 +307,7 @@ private:
 		signal.push_back(last);
 		signal.push_back(last);
 		auto encoded_4b5b = encode_4b5b(frame);
-		std::cerr << frame.size() << "mapped to " << encoded_4b5b.size() << "\n";
+		// std::cerr << frame.size() << "mapped to " << encoded_4b5b.size() << "\n";
 		for (auto x : encoded_4b5b) {
 			if (x == 1) {
 				last = -last;
