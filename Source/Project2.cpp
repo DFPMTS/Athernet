@@ -88,7 +88,8 @@ void* Project2_main_loop(void*)
 	adm.setAudioDeviceSetup(device_setup, false);
 
 	std::cerr << "Please configure your ASIO:\n";
-
+	getchar();
+	Athernet::Config::get_instance().timer_set();
 	std::cerr << "Running...\n";
 
 	srand(static_cast<unsigned int>(time(0)));

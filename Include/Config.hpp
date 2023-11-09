@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <ratio>
 #include <vector>
 
 using namespace std::string_literals;
@@ -215,6 +217,16 @@ public:
 		return map_5b_4b[x];
 	}
 
+	void timer_set() { start = std::chrono::system_clock::now(); }
+
+	void timer_get()
+	{
+		auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(
+			std::chrono::system_clock::now() - start);
+		std::cerr << "Time Used:     " << time_used.count() << "s"
+				  << "\n";
+	}
+
 private:
 	int bit_rate;
 
@@ -279,6 +291,8 @@ private:
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
 	int physical_buffer_size = 200'0000;
+
+	std::chrono::system_clock::time_point start;
 };
 
 }
