@@ -79,13 +79,19 @@ public:
 			}
 		}
 		if (accepted) {
-			while (window.size() && window[0]->seq <= ack) {
+			// ! special case: ack = 255,
+			while (window.size() && window[0]->seq < ack) {
 				std::cerr << "Discard:  " << window[0]->seq << ",  " << window_start << "\n";
 				window.discard(1);
 				--start;
 				if (++window_start >= config.get_seq_limit())
 					window_start -= config.get_seq_limit();
 			}
+			std::cerr << "Discard:  " << window[0]->seq << ",  " << window_start << "\n";
+			window.discard(1);
+			--start;
+			if (++window_start >= config.get_seq_limit())
+				window_start -= config.get_seq_limit();
 			if (start < 0)
 				start = 0;
 			producer.notify_one();
