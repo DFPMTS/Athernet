@@ -88,7 +88,8 @@ void* Project2_main_loop(void*)
 	adm.setAudioDeviceSetup(device_setup, false);
 
 	std::cerr << "Please configure your ASIO:\n";
-	getchar();
+	int packet_size = 0;
+	std::cin >> packet_size;
 	Athernet::Config::get_instance().timer_set();
 	std::cerr << "Running...\n";
 
@@ -122,8 +123,6 @@ void* Project2_main_loop(void*)
 	}
 	fclose(fd);
 	std::cerr << text.size() << "\n";
-	int packet_size = 0;
-	std::cin >> packet_size;
 	for (int i = 0; i < text.size(); i += packet_size) {
 		Athernet::Frame a;
 		for (int j = 0; j < packet_size; ++j) {
