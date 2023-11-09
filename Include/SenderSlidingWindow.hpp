@@ -63,7 +63,7 @@ public:
 
 			} else if (ack < window_start + config.get_window_size() - config.get_seq_limit()) {
 				accepted = true;
-				while (window.size() && window[0]->seq >= window_start) {
+				while (window.size() && window_start != 0) {
 					std::cerr << "Discard:  " << window[0]->seq << ",  " << window_start << "\n";
 					window.discard(1);
 					--start;
