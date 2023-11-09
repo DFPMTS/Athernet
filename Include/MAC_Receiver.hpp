@@ -93,7 +93,7 @@ public:
 				m_receiver_window.collect(a);
 				std::cerr << "File size:  " << a.size() << "\n";
 				std::string file = "MAC_received.txt";
-				FILE* receive_fd = fopen((NOTEBOOK_DIR + file).c_str(), "wc");
+				FILE* receive_fd = fopen((NOTEBOOK_DIR + file).c_str(), "wb");
 				if (!receive_fd) {
 					std::cerr << "Unable to open " << file << "!\n";
 					assert(0);

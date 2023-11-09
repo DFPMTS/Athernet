@@ -109,7 +109,7 @@ void* Project2_main_loop(void*)
 	std::vector<int> text;
 
 	file = NOTEBOOK_DIR + file;
-	auto fd = fopen(file.c_str(), "r");
+	auto fd = fopen(file.c_str(), "rb");
 	if (!fd) {
 		std::cerr << "File not found!\n";
 		assert(0);
@@ -120,7 +120,7 @@ void* Project2_main_loop(void*)
 		}
 	}
 	fclose(fd);
-
+	std::cerr << text.size() << "\n";
 	for (int i = 0; i < text.size(); i += 500) {
 		Athernet::Frame a;
 		for (int j = 0; j < 500; ++j) {
