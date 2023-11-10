@@ -89,7 +89,7 @@ public:
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
-				if (counter <= 0)
+				if (counter <= 0 && control.ack.load() == last_ack)
 					counter = slot * 2;
 				if (!control.busy.load())
 					++ack_timeout;
