@@ -126,7 +126,7 @@ public:
 				--counter;
 				if (control.previlege_node.load() != config.get_self_id()
 					&& control.previlege_node.load() != (config.get_self_id() ^ 1)) {
-					counter -= 2;
+					counter -= slot;
 				}
 				if (cur_ack != last_ack) {
 					--counter;
