@@ -90,7 +90,7 @@ public:
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
 				if (counter <= 0)
-					counter = slot;
+					counter = slot * 2;
 				if (!control.busy.load())
 					++ack_timeout;
 				if (control.collision.load())
