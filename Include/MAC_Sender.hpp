@@ -91,6 +91,9 @@ public:
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
+				if (counter <= 0) {
+					counter = slot;
+				}
 				if (!control.busy.load())
 					++ack_timeout;
 				if (control.collision.load())
@@ -123,7 +126,7 @@ public:
 				--counter;
 				if (control.previlege_node.load() != config.get_self_id()
 					&& control.previlege_node.load() != (config.get_self_id() ^ 1)) {
-					--counter;
+					counter -= 2;
 				}
 				if (cur_ack != last_ack) {
 					--counter;
