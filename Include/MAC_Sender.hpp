@@ -124,10 +124,10 @@ public:
 				// }
 				// race!
 				--counter;
-				if (control.ack.load() != last_ack) {
-					// ACK has higher priority
-					--counter;
-				}
+				// if (control.ack.load() != last_ack) {
+				// 	// ACK has higher priority
+				// 	--counter;
+				// }
 				if (counter < 0) {
 
 					// if (control.previlege_node != config.get_self_id()) {
