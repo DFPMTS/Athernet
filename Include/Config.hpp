@@ -199,7 +199,7 @@ public:
 	float get_collision_threshold() const { return 0.0005f; }
 	// float get_collision_threshold() const { return 0.5; }
 
-	int get_window_size() const { return 4; }
+	int get_window_size() const { return 5; }
 
 	int get_seq_bits_length() const { return 8; }
 

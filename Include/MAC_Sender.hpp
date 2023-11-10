@@ -75,15 +75,13 @@ public:
 		static int jammed = 0;
 		static int slot = 12;
 		static int backoff = 1;
-		static int has_ack = 0;
 		static int sent = 0;
-		static int hold_limit = 5;
 		static int ack_timeout = 0;
 		static int last_ack = -1;
 		static int cur_ack = -1;
 
 		if (!packet) {
-			if (ack_timeout > 2 * slot) {
+			if (ack_timeout > slot + slot >> 1) {
 				m_sender_window.reset();
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -171,12 +169,7 @@ public:
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
-					// std::cerr << "Ack commited\n";
-					if (++sent >= hold_limit) {
-						// yield
-						counter = (rand() % backoff + 2) * slot;
-						hold_channel = 0;
-					}
+					counter = 0;
 					backoff = 1;
 				}
 				return index;
