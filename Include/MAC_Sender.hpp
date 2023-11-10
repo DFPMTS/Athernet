@@ -120,10 +120,6 @@ public:
 		if (!hold_channel) {
 			if (!control.busy.load()) {
 
-				if (control.previlege_node == (config.get_self_id() ^ 1)) {
-					counter = 0;
-				}
-
 				--counter;
 
 				// race!
@@ -156,7 +152,7 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff + 1) * slot;
+				counter = (rand() % backoff) * slot;
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
