@@ -150,8 +150,12 @@ public:
 			if (control.collision.load()) {
 				// collide!
 				hold_channel = 0;
-				backoff <<= 1;
-				counter = (rand() % backoff) * slot;
+				if (last_ack == cur_ack) {
+					backoff <<= 1;
+					counter = (rand() % backoff) * slot;
+				} else {
+					counter = (rand() % backoff) * slot;
+				}
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
