@@ -119,11 +119,11 @@ public:
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
-				// if (control.ack.load() != last_ack && control.previlege_node.load() !=
-				// config.get_self_id()) {
-				// 	// ACK has the highest priority
-				// 	counter = 0;
-				// }
+
+				if (control.ack.load() != last_ack && control.previlege_node.load() != config.get_self_id()) {
+					// ACK has the highest priority
+					counter = 0;
+				}
 
 				--counter;
 
