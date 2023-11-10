@@ -58,11 +58,14 @@ public:
 	{
 		MacFrame mac_frame;
 		int data_packet = 0;
+		int finished = 0;
 		while (display_running.load()) {
 			if (!m_recv_queue.pop(mac_frame)) {
 				std::this_thread::yield();
 				continue;
 			}
+			if (finished)
+				continue;
 			if (!mac_frame.bad_data && !mac_frame.is_ack)
 				std::cerr << "-------------------------------GOT-DATA-------------------------------\n";
 			else
@@ -111,6 +114,7 @@ public:
 					}
 				}
 				fclose(receive_fd);
+				finished = 0;
 			}
 		}
 		std::cerr << "Total data packets:   " << data_packet << "\n";
