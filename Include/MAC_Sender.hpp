@@ -89,9 +89,6 @@ public:
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
-				if (counter <= 0) {
-					counter = (rand() % 2 + 1) * slot;
-				}
 				if (!control.busy.load())
 					++ack_timeout;
 				if (control.collision.load())
@@ -157,10 +154,7 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff + 1) * slot;
-				if (control.previlege_node == config.get_self_id()
-					|| control.previlege_node == (config.get_self_id() ^ 1))
-					counter = counter << 1;
+				counter = (rand() % backoff) * slot;
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
