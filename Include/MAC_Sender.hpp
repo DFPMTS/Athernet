@@ -116,8 +116,6 @@ public:
 			}
 		}
 
-		--counter;
-
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
@@ -126,6 +124,9 @@ public:
 				// 	// ACK has the highest priority
 				// 	counter = 0;
 				// }
+
+				--counter;
+
 				// race!
 				if (counter < 0) {
 
