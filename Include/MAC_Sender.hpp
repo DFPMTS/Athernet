@@ -80,7 +80,6 @@ public:
 		static int cur_ack = -1;
 
 		if (!packet && (last_ack != control.ack.load() || !m_sender_window.empty())) {
-			std::cerr << last_ack << "    " << control.ack.load() << "\n";
 			srand(config.get_self_id() + rand());
 			if (ack_timeout > slot * 10) {
 				m_sender_window.reset();
