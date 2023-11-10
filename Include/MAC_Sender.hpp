@@ -75,13 +75,12 @@ public:
 		static int jammed = 0;
 		static int slot = 12;
 		static int backoff = 1;
-		static int sent = 0;
 		static int ack_timeout = 0;
 		static int last_ack = -1;
 		static int cur_ack = -1;
 
 		if (!packet) {
-			if (ack_timeout > slot + slot >> 1) {
+			if (ack_timeout > slot + (slot >> 1)) {
 				m_sender_window.reset();
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -134,7 +133,6 @@ public:
 					hold_channel = 1;
 					jammed = 0;
 					start = 0;
-					sent = 0;
 					int index = 0;
 					for (int i = start; index < count && i < signal.size(); ++i, ++start) {
 						buffer[index++] = signal[i];
