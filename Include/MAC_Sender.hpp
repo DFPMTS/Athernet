@@ -239,7 +239,7 @@ private:
 		signal.clear();
 		append_preamble(signal);
 
-		Frame frame = std::vector(300);
+		Frame frame = std::vector<int>(300);
 		Frame length;
 		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
 		modulate_vec_4b5b_nrzi(length, signal);
