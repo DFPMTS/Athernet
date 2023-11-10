@@ -173,8 +173,7 @@ public:
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
-					counter = slot;
-					hold_channel = 0;
+					counter = 0;
 					backoff = 1 << 2;
 				}
 				return index;
