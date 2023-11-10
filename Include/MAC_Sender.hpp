@@ -91,7 +91,7 @@ public:
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
 				if (counter <= 0) {
-					counter = (rand() % 3 + 1) * slot;
+					counter = (rand() % 2 + 1) * slot;
 				}
 				if (!control.busy.load())
 					++ack_timeout;
@@ -118,9 +118,7 @@ public:
 			}
 		}
 
-		if (control.previlege_node != config.get_self_id()
-			&& control.previlege_node != (config.get_self_id() ^ 1))
-			--counter;
+		--counter;
 
 		// race begin
 		if (!hold_channel) {
@@ -131,14 +129,6 @@ public:
 				// 	counter = 0;
 				// }
 				// race!
-				--counter;
-				if (control.ack.load() != last_ack
-					&& (control.previlege_node == config.get_self_id()
-						|| control.previlege_node == (config.get_self_id() ^ 1))) {
-					// ACK has higher priority
-					counter -= 2;
-				}
-				std::cerr << ">Counter:   " << counter << "\n";
 				if (counter < 0) {
 
 					// if (control.previlege_node != config.get_self_id()) {
