@@ -10,12 +10,6 @@
 
 using namespace std::string_literals;
 
-#ifndef WIN
-#define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
-#else
-#define NOTEBOOK_DIR "D:/fa23/Athernet/Extras/"s
-#endif
-
 namespace Athernet {
 
 // * For tag dispatch
@@ -199,7 +193,7 @@ public:
 	float get_collision_threshold() const { return 0.0005f; }
 	// float get_collision_threshold() const { return 0.5; }
 
-	int get_window_size() const { return 4; }
+	int get_window_size() const { return 4600; }
 
 	int get_seq_bits_length() const { return 8; }
 

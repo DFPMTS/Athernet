@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 3.5)
 
 project("Project2")
 
+add_compile_definitions(NOTEBOOK_DIR="${CMAKE_CURRENT_LIST_DIR}/../Extras/")
+
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 
   # The file structure has to be:
