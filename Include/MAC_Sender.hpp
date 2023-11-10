@@ -81,16 +81,18 @@ public:
 
 		if (!packet) {
 			srand(config.get_self_id() + rand());
-			if (ack_timeout > slot * 10) {
+			if (ack_timeout > slot * 5) {
 				m_sender_window.reset();
+				last_ack = -1;
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
 				// 			 "!!!!!!!!!!!!!!!!!!!!\n";
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
-				if (counter <= 0 && control.ack.load() == last_ack)
-					counter = slot * 2;
+				if (counter <= 0) {
+					counter = (rand() % 3 + 1) * slot;
+				}
 				if (!control.busy.load())
 					++ack_timeout;
 				if (control.collision.load())
@@ -130,8 +132,11 @@ public:
 				// }
 				// race!
 				--counter;
-				if (cur_ack != last_ack) {
-					counter -= 3;
+				if (control.ack.load() != last_ack
+					&& (control.previlege_node == config.get_self_id()
+						|| control.previlege_node == (config.get_self_id() ^ 1))) {
+					// ACK has higher priority
+					counter -= 2;
 				}
 
 				if (counter < 0) {
@@ -163,10 +168,10 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff) * slot;
+				counter = (rand() % backoff + 1) * slot;
 				if (control.previlege_node == config.get_self_id()
 					|| control.previlege_node == (config.get_self_id() ^ 1))
-					counter = (counter + slot) << 1;
+					counter = counter << 1;
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
