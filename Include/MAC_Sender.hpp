@@ -79,7 +79,7 @@ public:
 		static int last_ack = -1;
 		static int cur_ack = -1;
 
-		if (!packet) {
+		if (!packet && (last_ack != control.ack.load() || !m_sender_window.empty())) {
 			srand(config.get_self_id() + rand());
 			if (ack_timeout > slot * 5) {
 				m_sender_window.reset();
@@ -252,7 +252,7 @@ private:
 		signal.clear();
 		append_preamble(signal);
 
-		Frame frame = std::vector<int>(300);
+		Frame frame = std::vector<int>(400);
 		Frame length;
 		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
 		modulate_vec_4b5b_nrzi(length, signal);
