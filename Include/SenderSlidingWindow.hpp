@@ -41,7 +41,7 @@ public:
 		}
 	}
 
-	bool empty() { return window.size() > 0; }
+	bool empty() { return window.size() == 0; }
 
 	bool consume_one(std::shared_ptr<PHY_Unit>& unit)
 	{
