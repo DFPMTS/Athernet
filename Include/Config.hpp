@@ -181,7 +181,7 @@ public:
 
 	const std::vector<int>& get_crc() const { return crc; }
 
-	int set_self_id(int addr) { mac_address = addr; }
+	void set_self_id(int addr) { mac_address = addr; }
 	int get_self_id() { return mac_address; }
 
 	float get_collision_threshold() const { return 0.0005f; }
