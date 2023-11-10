@@ -124,7 +124,8 @@ public:
 				if (control.previlege_node.load() != config.get_self_id()
 					&& control.previlege_node.load() != (config.get_self_id() ^ 1)) {
 					--counter;
-				} else if (control.previlege_node.load() != config.get_self_id()) {
+				}
+				if (cur_ack != last_ack) {
 					--counter;
 				}
 
