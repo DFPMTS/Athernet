@@ -184,7 +184,7 @@ public:
 	void set_self_id(int addr) { mac_address = addr; }
 	int get_self_id() { return mac_address; }
 
-	float get_collision_threshold() const { return 0.0005f; }
+	float get_collision_threshold() const { return 0.0002f; }
 	// float get_collision_threshold() const { return 0.5; }
 
 	int get_window_size() const { return 4; }
