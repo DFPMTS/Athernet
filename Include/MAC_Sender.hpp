@@ -81,7 +81,7 @@ public:
 
 		if (!packet) {
 			srand(config.get_self_id() + rand());
-			if (ack_timeout > slot * 4) {
+			if (ack_timeout > slot * 10) {
 				m_sender_window.reset();
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -124,7 +124,8 @@ public:
 				// }
 				// race!
 				--counter;
-				if (control.ack.load() != last_ack && control.previlege_node.load() != config.get_self_id()) {
+				if (control.ack.load() != last_ack && control.previlege_node.load() != config.get_self_id()
+					&& control.previlege_node.load() != (config.get_self_id() ^ 1)) {
 					// ACK has higher priority
 					--counter;
 				}

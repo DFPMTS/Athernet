@@ -46,10 +46,9 @@ public:
 		sum = 0;
 		control.busy.store(false);
 		for (int i = 0; i < numSamples; ++i) {
-			sum += inputChannelData[0][i] * inputChannelData[0][i];
+			if (fabs(inputChannelData[0][i]) > 0.01)
+				control.busy.store(true);
 		}
-		if (sum > 0.001)
-			control.busy.store(true);
 
 		if (!control.collision.load())
 			m_receiver.push_stream(inputChannelData[0], numSamples);
