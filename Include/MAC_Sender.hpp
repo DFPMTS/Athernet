@@ -114,8 +114,9 @@ public:
 			}
 		}
 
-		if (control.previlege_node != config.get_self_id()
-			&& control.previlege_node != (config.get_self_id() ^ 1))
+		if ((control.previlege_node != config.get_self_id()
+				&& control.previlege_node != (config.get_self_id() ^ 1))
+			|| control.ack.load() != last_ack)
 			--counter;
 
 		// race begin
@@ -128,10 +129,6 @@ public:
 				// }
 				// race!
 				--counter;
-				if (control.ack.load() != last_ack) {
-					// ACK has higher priority
-					--counter;
-				}
 
 				if (counter < 0) {
 
