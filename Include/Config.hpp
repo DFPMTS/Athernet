@@ -8,12 +8,6 @@
 
 using namespace std::string_literals;
 
-#ifndef WIN
-#define NOTEBOOK_DIR "/Users/dfpmts/Desktop/JUCE_Demos/NewProject/Extras/"s
-#else
-#define NOTEBOOK_DIR "D:/fa23/Athernet/Extras/"s
-#endif
-
 namespace Athernet {
 
 // * For tag dispatch
@@ -212,7 +206,7 @@ private:
 	// ! REVERSED for simplicity
 	std::vector<int> crc = { 1, 1, 1, 0, 1, 0, 1, 0, 1 }; // CRC8
 
-	int physical_buffer_size = 10'0000;
+	int physical_buffer_size = 100'0000;
 };
 
 }
