@@ -123,12 +123,12 @@ public:
 				--counter;
 				if (counter < 0) {
 
-					if (control.previlege_node != config.get_self_id()) {
-						m_sender_window.reset();
-						if (m_sender_window.consume_one(packet)) {
-							modulate(packet->frame, packet->seq, control.ack.load());
-						}
-					}
+					// if (control.previlege_node != config.get_self_id()) {
+					// 	m_sender_window.reset();
+					// 	if (m_sender_window.consume_one(packet)) {
+					// 		modulate(packet->frame, packet->seq, control.ack.load());
+					// 	}
+					// }
 
 					// shoot!
 					hold_channel = 1;
