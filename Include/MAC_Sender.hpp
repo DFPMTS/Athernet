@@ -164,6 +164,9 @@ public:
 				hold_channel = 0;
 				backoff <<= 1;
 				counter = (rand() % backoff) * slot;
+				if (control.previlege_node == config.get_self_id()
+					|| control.previlege_node == (config.get_self_id() ^ 1))
+					counter = (counter + slot) << 1;
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
