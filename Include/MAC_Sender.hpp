@@ -127,7 +127,7 @@ public:
 				if (control.ack.load() != last_ack && control.previlege_node == config.get_self_id()
 					|| control.previlege_node == (config.get_self_id() ^ 1)) {
 					// ACK has higher priority
-					--counter;
+					counter -= 2;
 				}
 				if (counter < 0) {
 
