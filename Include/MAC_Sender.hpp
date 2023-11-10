@@ -116,14 +116,17 @@ public:
 			}
 		}
 
-		--counter;
-		if (cur_ack != last_ack) {
-			--counter;
-		}
-
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
+
+				--counter;
+				if (control.previlege_node.load() != config.get_self_id()
+					&& control.previlege_node.load() != (config.get_self_id() ^ 1)) {
+					--counter;
+				} else if (control.previlege_node.load() != config.get_self_id()) {
+					--counter;
+				}
 
 				// race!
 				if (counter < 0) {
@@ -155,7 +158,8 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff) * slot;
+				counter = (rand() % backoff + (int)(config.get_self_id() == control.previlege_node.load()))
+					* slot;
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
