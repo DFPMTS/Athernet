@@ -124,7 +124,8 @@ public:
 				// }
 				// race!
 				--counter;
-				if (control.ack.load() != last_ack) {
+				if (control.ack.load() != last_ack && control.previlege_node == config.get_self_id()
+					|| control.previlege_node == (config.get_self_id() ^ 1)) {
 					// ACK has higher priority
 					--counter;
 				}
