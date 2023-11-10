@@ -89,9 +89,6 @@ public:
 			}
 			bool succ = m_sender_window.consume_one(packet);
 			if (!succ) {
-				if (counter <= 0) {
-					counter = slot;
-				}
 				if (!control.busy.load())
 					++ack_timeout;
 				if (control.collision.load())
@@ -127,6 +124,7 @@ public:
 				// }
 				// race!
 				--counter;
+				std::cerr << "Race Counter:   " << counter << "\n";
 				if (control.ack.load() != last_ack && control.previlege_node == config.get_self_id()
 					|| control.previlege_node == (config.get_self_id() ^ 1)) {
 					// ACK has higher priority
