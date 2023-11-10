@@ -181,14 +181,8 @@ public:
 
 	const std::vector<int>& get_crc() const { return crc; }
 
-	int get_self_id()
-	{
-#ifdef WIN
-		return 0;
-#else
-		return 1;
-#endif
-	}
+	int set_self_id(int addr) { mac_address = addr; }
+	int get_self_id() { return mac_address; }
 
 	float get_collision_threshold() const { return 0.0005f; }
 	// float get_collision_threshold() const { return 0.5; }
@@ -241,6 +235,8 @@ private:
 
 	// 7 for windows start position, 19 for window itself
 	int phy_coding_overhead = 7 + 19;
+
+	int mac_address = -1;
 
 	int map_4b_5b[16] = { 30, 9, 20, 21, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 28, 29 };
 	int map_5b_4b[32] = {

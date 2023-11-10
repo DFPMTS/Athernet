@@ -88,6 +88,10 @@ void* Project2_main_loop(void*)
 	adm.setAudioDeviceSetup(device_setup, false);
 
 	std::cerr << "Please configure your ASIO:\n";
+	int id = 0;
+	std::cerr << "MAC Adress:\n";
+	std::cin >> id;
+	Athernet::Config::get_instance().set_self_id(id);
 	int packet_size = 0;
 	std::cin >> packet_size;
 	Athernet::Config::get_instance().timer_set();
