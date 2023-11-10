@@ -73,7 +73,7 @@ public:
 		static int hold_channel = 0;
 		static int trying_channel = 0;
 		static int jammed = 0;
-		static int slot = 12;
+		static int slot = 18;
 		static int backoff = 1;
 		static int ack_timeout = 0;
 		static int last_ack = -1;
@@ -115,7 +115,7 @@ public:
 		}
 
 		--counter;
-		std::cerr << "Race Counter:   " << counter << "\n";
+		// std::cerr << "Race Counter:   " << counter << "\n";
 		if (control.ack.load() != last_ack && control.previlege_node == config.get_self_id()
 			|| control.previlege_node == (config.get_self_id() ^ 1)) {
 			// ACK has higher priority
