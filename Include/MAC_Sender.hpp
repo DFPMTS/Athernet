@@ -116,14 +116,14 @@ public:
 			}
 		}
 
+		--counter;
+		if (cur_ack != last_ack) {
+			--counter;
+		}
+
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
-
-				--counter;
-				if (cur_ack != last_ack) {
-					--counter;
-				}
 
 				// race!
 				if (counter < 0) {
