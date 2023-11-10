@@ -158,10 +158,10 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff) * slot;
+				counter = (rand() % backoff + 1) * slot;
 				if (control.previlege_node == config.get_self_id()
 					|| control.previlege_node == (config.get_self_id() ^ 1)) {
-					counter = (counter + slot) << 1;
+					counter = counter << 1;
 				}
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
