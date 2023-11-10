@@ -114,6 +114,14 @@ public:
 			}
 		}
 
+		--counter;
+		std::cerr << "Race Counter:   " << counter << "\n";
+		if (control.ack.load() != last_ack && control.previlege_node == config.get_self_id()
+			|| control.previlege_node == (config.get_self_id() ^ 1)) {
+			// ACK has higher priority
+			counter -= 2;
+		}
+
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
@@ -123,13 +131,6 @@ public:
 				// 	counter = 0;
 				// }
 				// race!
-				--counter;
-				std::cerr << "Race Counter:   " << counter << "\n";
-				if (control.ack.load() != last_ack && control.previlege_node == config.get_self_id()
-					|| control.previlege_node == (config.get_self_id() ^ 1)) {
-					// ACK has higher priority
-					counter -= 2;
-				}
 				if (counter < 0) {
 
 					// if (control.previlege_node != config.get_self_id()) {
