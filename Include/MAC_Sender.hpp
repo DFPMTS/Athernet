@@ -74,7 +74,7 @@ public:
 		static int trying_channel = 0;
 		static int jammed = 0;
 		static int slot = 12;
-		static int backoff = 1;
+		static int backoff = 1 << 2;
 		static int ack_timeout = 0;
 		static int last_ack = -1;
 		static int cur_ack = -1;
@@ -124,13 +124,6 @@ public:
 			if (!control.busy.load()) {
 
 				--counter;
-				if (control.previlege_node.load() != config.get_self_id()
-					&& control.previlege_node.load() != (config.get_self_id() ^ 1)) {
-					counter -= slot;
-				}
-				if (cur_ack != last_ack) {
-					--counter;
-				}
 
 				// race!
 				if (counter < 0) {
@@ -162,8 +155,7 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff + (int)(config.get_self_id() == control.previlege_node.load()))
-					* slot;
+				counter = (rand() % backoff) * slot;
 				std::cerr
 					<< "***********************************CLASH**************************************\n";
 				std::cerr << "Counter:    " << counter << "\n";
@@ -185,7 +177,7 @@ public:
 					packet.reset();
 					last_ack = cur_ack;
 					counter = 0;
-					backoff = 1;
+					backoff = 1 << 2;
 				}
 				return index;
 			}
