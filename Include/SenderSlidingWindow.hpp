@@ -58,7 +58,7 @@ public:
 	{
 		std::scoped_lock lock { mutex };
 		bool accepted = false;
-		std::cerr << "Got ack:  " << ack << "   -   " << window_start << "\n";
+		// std::cerr << "Got ack:  " << ack << "   -   " << window_start << "\n";
 		if (window_start + config.get_window_size() > config.get_seq_limit()) {
 			if (ack >= window_start) {
 				accepted = true;
