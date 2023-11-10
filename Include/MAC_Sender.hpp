@@ -80,6 +80,7 @@ public:
 		static int cur_ack = -1;
 
 		if (!packet) {
+			srand(config.get_self_id() + rand());
 			if (ack_timeout > slot + (slot >> 1)) {
 				m_sender_window.reset();
 				// std::cerr <<
