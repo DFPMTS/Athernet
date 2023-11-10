@@ -81,7 +81,7 @@ public:
 
 		if (!packet) {
 			srand(config.get_self_id() + rand());
-			if (ack_timeout > slot + (slot >> 1)) {
+			if (ack_timeout > slot * 4) {
 				m_sender_window.reset();
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -151,7 +151,7 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				counter = (rand() % backoff + 1) * slot;
+				counter = (rand() % backoff) * slot;
 				if (!jammed) {
 					for (int i = 0; i < count; ++i) {
 						buffer[i] = (float)(rand() % 50 + 50) / 100;
