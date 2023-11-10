@@ -91,6 +91,8 @@ public:
 			if (!succ) {
 				if (!control.busy.load())
 					++ack_timeout;
+				if (control.collision.load())
+					ack_timeout = 0;
 				if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
 					cur_ack = control.ack.load();
 					// std::cerr << " Send ACK:   " << cur_ack << "\n";
