@@ -120,13 +120,10 @@ public:
 		if (!hold_channel) {
 			if (!control.busy.load()) {
 
-				if (control.ack.load() != last_ack
-					&& control.previlege_node.load() == (config.get_self_id() ^ 1)) {
-					// ACK has the highest priority
-					counter = 0;
-				}
-
 				--counter;
+				if (cur_ack != last_ack) {
+					--counter;
+				}
 
 				// race!
 				if (counter < 0) {
