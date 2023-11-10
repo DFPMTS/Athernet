@@ -117,6 +117,10 @@ public:
 			}
 		}
 
+		if (control.previlege_node != config.get_self_id()
+			&& control.previlege_node != (config.get_self_id() ^ 1))
+			--counter;
+
 		// race begin
 		if (!hold_channel) {
 			if (!control.busy.load()) {
