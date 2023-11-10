@@ -83,7 +83,6 @@ public:
 			srand(config.get_self_id() + rand());
 			if (ack_timeout > slot * 5) {
 				m_sender_window.reset();
-				last_ack = -1;
 				// std::cerr <<
 				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
 				// 			 "!!!!!!!!!!!!!!!!!!!!\n";
