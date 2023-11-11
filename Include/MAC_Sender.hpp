@@ -81,6 +81,7 @@ public:
 		static int syn_sent = 0;
 		static int registered_ack = -1;
 		static int ack_flying = 0;
+		static int continuous_sent = 0;
 
 		if (control.transmission_start.load()) {
 			control.clock.fetch_add(1);
@@ -166,6 +167,7 @@ public:
 
 					// shoot!
 					hold_channel = 1;
+					continuous_sent = 0;
 					jammed = 0;
 					start = 0;
 					int index = 0;
@@ -209,8 +211,12 @@ public:
 					packet.reset();
 					last_ack = cur_ack;
 					ack_flying = 0;
-					counter = slot >> 1;
+
 					backoff = 1;
+					if (++continuous_sent >= 3) {
+						hold_channel = 0;
+						counter = slot >> 1;
+					}
 					if (syn_issued && !control.transmission_start.load()) {
 						syn_sent = 1;
 					}
