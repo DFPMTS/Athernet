@@ -73,7 +73,7 @@ public:
 		static int hold_channel = 0;
 		static int trying_channel = 0;
 		static int jammed = 0;
-		static int slot = 12;
+		static int slot = 15;
 		static int backoff = 1 << 2;
 		static int ack_timeout = 0;
 		static int last_ack = -1;
