@@ -89,8 +89,16 @@ void* Project2_main_loop(void*)
 
 	std::cerr << "Please configure your ASIO:\n";
 	int id = 0;
+	{
+		auto fin = std::ifstream(NOTEBOOK_DIR "mac_addr.txt");
+		if (!fin) {
+			std::cerr << "Fail to read mac_addr.txt!\n";
+			assert(0);
+		}
+		fin >> id;
+	}
 	std::cerr << "MAC Adress:\n";
-	std::cin >> id;
+	std::cerr << id << "\n";
 	Athernet::Config::get_instance().set_self_id(id);
 	int packet_size = 500;
 	auto physical_layer = &mac_layer->phy_layer;
