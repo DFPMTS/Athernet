@@ -128,8 +128,7 @@ void* Project2_main_loop(void*)
 			a.push_back((i + j < text.size()) ? text[i + j] : 0);
 		}
 		a.push_back(0);
-		for (int j = 0; j < 10; ++j)
-			physical_layer->send_frame(a);
+		physical_layer->send_frame(a);
 	}
 
 	std::string s;
