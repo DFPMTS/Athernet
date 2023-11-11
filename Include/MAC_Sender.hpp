@@ -80,6 +80,7 @@ public:
 		static int syn_issued = 0;
 		static int syn_sent = 0;
 		static int registered_ack = -1;
+		static int ack_flying = 0;
 
 		if (control.transmission_start.load()) {
 			control.clock.fetch_add(1);
@@ -114,6 +115,7 @@ public:
 				if (ack_timeout > slot * 10) {
 					m_sender_window.reset();
 					last_ack = -1;
+					ack_timeout = 0;
 					++ack_timeout_times;
 				}
 
@@ -123,12 +125,13 @@ public:
 						++ack_timeout;
 					if (control.collision.load())
 						ack_timeout = 0;
-					if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
-						cur_ack = control.ack.load();
+					int ack = control.ack.load();
+					if (ack != last_ack && ack != cur_ack && !ack_flying) {
+						cur_ack = ack;
 						gen_ack(cur_ack);
+						ack_flying = 1;
 					}
-					config.log(std::format(
-						"cur_ack:  {},  last_ack:  {},  ack:  {}", cur_ack, last_ack, control.ack.load()));
+
 					if (control.ack.load() == last_ack) {
 						hold_channel = 0;
 						return 0;
@@ -206,6 +209,7 @@ public:
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
+					ack_flying = 0;
 					counter = slot >> 1;
 					backoff = 1;
 					if (syn_issued && !control.transmission_start.load()) {
