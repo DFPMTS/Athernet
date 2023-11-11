@@ -115,9 +115,6 @@ public:
 					m_sender_window.reset();
 					last_ack = -1;
 					++ack_timeout_times;
-					// std::cerr <<
-					// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
-					// 			 "!!!!!!!!!!!!!!!!!!!!\n";
 				}
 
 				bool succ = m_sender_window.consume_one(packet);
@@ -128,9 +125,10 @@ public:
 						ack_timeout = 0;
 					if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
 						cur_ack = control.ack.load();
-						// std::cerr << " Send ACK:   " << cur_ack << "\n";
 						gen_ack(cur_ack);
 					}
+					config.log(std::format(
+						"cur_ack:  {},  last_ack:  {},  ack:  {}", cur_ack, last_ack, control.ack.load()));
 					if (control.ack.load() == last_ack) {
 						hold_channel = 0;
 						return 0;
