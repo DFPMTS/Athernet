@@ -85,6 +85,7 @@ public:
 
 			if (mac_frame.is_syn) {
 				control.transmission_start.store(true);
+				config.timer_set();
 				continue;
 			}
 

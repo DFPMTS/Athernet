@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Config.hpp"
+#include <format>
 #include <vector>
 
 namespace Athernet {
@@ -39,7 +40,7 @@ public:
 				accepted = true;
 			}
 		}
-		std::cerr << "Received:  " << seq << "   " << window_start << "\n";
+		config.log(std::format("Received:  {},  {}", seq, window_start));
 		if (accepted) {
 			window[seq] = 1;
 			packets[seq] = std::move(packet_payload);

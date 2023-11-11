@@ -3,6 +3,7 @@
 #include "PHY_Unit.hpp"
 #include "RingBuffer.hpp"
 #include <atomic>
+#include <format>
 #include <mutex>
 #include <queue>
 
@@ -66,7 +67,7 @@ public:
 			} else if (ack < window_start + config.get_window_size() - config.get_seq_limit()) {
 				accepted = true;
 				while (window.size() && window_start != 0) {
-					std::cerr << "Discard:  " << window[0]->seq << ",  " << window_start << "\n";
+					config.log(std::format("Acked:  {},  {}", window[0]->seq, ack));
 					window.discard(1);
 					--start;
 					if (++window_start >= config.get_seq_limit())
@@ -83,13 +84,13 @@ public:
 		if (accepted) {
 			// ! special case: ack = 255,
 			while (window.size() && window[0]->seq < ack) {
-				std::cerr << "Discard:  " << window[0]->seq << ",  " << window_start << "\n";
+				config.log(std::format("Acked:  {},  {}", window[0]->seq, ack));
 				window.discard(1);
 				--start;
 				if (++window_start >= config.get_seq_limit())
 					window_start -= config.get_seq_limit();
 			}
-			std::cerr << "Discard:  " << window[0]->seq << ",  " << window_start << "\n";
+			config.log(std::format("Acked:  {},  {}", window[0]->seq, ack));
 			window.discard(1);
 			--start;
 			if (++window_start >= config.get_seq_limit())
