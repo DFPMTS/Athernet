@@ -213,7 +213,7 @@ public:
 					ack_flying = 0;
 
 					backoff = 1;
-					if (++continuous_sent >= (config.get_window_size() >> 1)) {
+					if (++continuous_sent >= (config.get_window_size() >> 2)) {
 						hold_channel = 0;
 						counter = slot >> 1;
 					}
@@ -278,7 +278,7 @@ private:
 		signal.clear();
 		append_preamble(signal);
 
-		Frame frame = std::vector<int>(100);
+		Frame frame = std::vector<int>(50);
 		Frame length;
 		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
 		modulate_vec_4b5b_nrzi(length, signal);
@@ -316,6 +316,9 @@ private:
 		// modulate_vec(mac_frame, signal);
 		modulate_vec_4b5b_nrzi(mac_frame, signal);
 		int signal_size = signal.size();
+		signal.resize(signal_size * 2);
+		std::copy(std::begin(signal), std::begin(signal) + signal_size, std::begin(signal) + signal_size);
+		signal_size = signal.size();
 		signal.resize(signal_size * 2);
 		std::copy(std::begin(signal), std::begin(signal) + signal_size, std::begin(signal) + signal_size);
 	}

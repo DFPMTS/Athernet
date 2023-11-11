@@ -72,7 +72,7 @@ public:
 			config.log(std::format("From: {} --> To: {}", mac_frame.from, mac_frame.to));
 			config.log(std::format(
 				"Seq: {}   Has ACK: {}   ACK: {}", mac_frame.seq, mac_frame.has_ack, mac_frame.ack));
-
+			config.log(std::format("Bad Data:  {}", mac_frame.bad_data));
 			config.log("----------------------------------------------------------------------");
 
 			if (!mac_frame.bad_data && !mac_frame.is_ack) {
