@@ -74,13 +74,26 @@ public:
 		static int slot = 16;
 		static int backoff = 1;
 		static int ack_timeout = 0;
+		static int ack_timeout_times = 0;
 		static int last_ack = -1;
 		static int cur_ack = -1;
 		static int syn_issued = 0;
 		static int syn_sent = 0;
+		static int registered_ack = -1;
 
 		if (control.transmission_start.load()) {
 			control.clock.fetch_add(1);
+		}
+
+		int ack_value = control.ack.load();
+		if (ack_value != registered_ack) {
+			ack_timeout_times = 0;
+			registered_ack = ack_value;
+		}
+
+		if (ack_timeout_times > 10) {
+			// no more messages / link dead
+			return 0;
 		}
 
 		if (!packet) {
@@ -114,10 +127,13 @@ public:
 				srand(config.get_self_id() + rand());
 				if (ack_timeout > slot * 10) {
 					m_sender_window.reset();
+					last_ack = -1;
+					++ack_timeout_times;
 					// std::cerr <<
 					// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
 					// 			 "!!!!!!!!!!!!!!!!!!!!\n";
 				}
+
 				bool succ = m_sender_window.consume_one(packet);
 				if (!succ) {
 					if (!control.busy.load())
