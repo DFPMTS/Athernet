@@ -12,6 +12,5 @@ struct Protocol_Control {
 	std::atomic_int ack = -1;
 	std::atomic_bool transmission_start = false;
 	std::atomic_int clock = 0;
-	std::atomic_int sent[4] = { 0, 0, 0, 0 };
 };
 }

@@ -110,20 +110,6 @@ public:
 					return 0;
 				}
 			} else {
-				int num_sent[4], min_num_sent = 0x3f3f3f3f;
-				for (int i = 0; i < 4; ++i) {
-					num_sent[i] = control.sent[i].load();
-					if (num_sent[i] < min_num_sent)
-						min_num_sent = num_sent[i];
-				}
-				int offset = num_sent[config.get_self_id()] - min_num_sent;
-				if (offset > 0) {
-					if (offset > 5)
-						offset = 5;
-					if (rand() % 10 < offset)
-						return 0;
-				}
-
 				srand(config.get_self_id() + rand());
 				if (ack_timeout > slot * 10) {
 					m_sender_window.reset();

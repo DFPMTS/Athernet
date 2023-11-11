@@ -77,7 +77,6 @@ public:
 
 			if (!mac_frame.bad_data && !mac_frame.is_ack) {
 				control.previlege_node.store(mac_frame.from);
-				control.sent[mac_frame.from].fetch_add(1);
 			}
 
 			// accept point to point / broadcast
