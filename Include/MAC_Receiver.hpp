@@ -60,7 +60,6 @@ public:
 		int finished = 0;
 		while (display_running.load()) {
 			if (!m_recv_queue.pop(mac_frame)) {
-				std::this_thread::yield();
 				continue;
 			}
 

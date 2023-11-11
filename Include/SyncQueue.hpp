@@ -25,7 +25,7 @@ public:
 	bool pop(T& item)
 	{
 		std::unique_lock lock { mutex };
-		// consumer.wait_for(lock, 100ms, [&]() { return !m_queue.empty(); });
+		consumer.wait_for(lock, 10ms, [&]() { return !m_queue.empty(); });
 		if (!m_queue.empty()) {
 			item = std::move(m_queue.front());
 			m_queue.pop();
