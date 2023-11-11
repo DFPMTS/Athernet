@@ -113,7 +113,7 @@ public:
 				}
 			} else {
 				srand(config.get_self_id() + rand());
-				if (ack_timeout > slot * 10) {
+				if (ack_timeout > slot * 10 * (ack_timeout_times + 1) * (ack_timeout_times + 1)) {
 					m_sender_window.reset();
 					ack_timeout = 0;
 					++ack_timeout_times;
