@@ -1,8 +1,10 @@
 #pragma once
 
+#include "Logger.hpp"
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <ratio>
@@ -211,9 +213,10 @@ public:
 	{
 		auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(
 			std::chrono::system_clock::now() - start);
-		std::cerr << "Time Used:     " << time_used.count() << "s"
-				  << "\n";
+		this->log(std::format("Time Used:  {}s", time_used.count()));
 	}
+
+	void log(std::string item) { logger.append_log(std::move(item)); }
 
 private:
 	int bit_rate;
@@ -283,6 +286,8 @@ private:
 	int physical_buffer_size = 200'0000;
 
 	std::chrono::system_clock::time_point start;
+
+	Logger logger;
 };
 
 }

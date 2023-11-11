@@ -57,49 +57,51 @@ public:
 	void forward_frame()
 	{
 		MacFrame mac_frame;
-		int data_packet = 0;
 		int finished = 0;
 		while (display_running.load()) {
 			if (!m_recv_queue.pop(mac_frame)) {
 				std::this_thread::yield();
 				continue;
 			}
-			if (finished) {
 
-			} else {
+			if (!mac_frame.bad_data && !mac_frame.is_ack)
+				config.log("-------------------------------GOT-DATA-------------------------------");
+			else
+				config.log("------------------------------GOT-HEADER------------------------------");
+			config.log(std::format(
+				"                               {}                               ", control.clock.load()));
+			config.log(std::format("From: {} --> To: {}", mac_frame.from, mac_frame.to));
+			config.log(std::format(
+				"Seq: {}   Has ACK: {}   ACK: {}", mac_frame.seq, mac_frame.has_ack, mac_frame.ack));
 
-				if (!mac_frame.bad_data && !mac_frame.is_ack)
-					std::cerr << "-------------------------------GOT-DATA-------------------------------\n";
-				else
-					std::cerr << "------------------------------GOT-HEADER------------------------------\n";
+			config.log("----------------------------------------------------------------------");
 
-				std::cerr << "From: " << mac_frame.from << " --> "
-						  << "To: " << mac_frame.to << "\n"
-						  << "Seq: " << mac_frame.seq << "    Has ack:" << mac_frame.has_ack
-						  << "  Ack: " << mac_frame.ack << "\n";
-				std::cerr << "----------------------------------------------------------------------\n";
-			}
 			if (!mac_frame.bad_data)
 				control.previlege_node.store(mac_frame.from);
 
-			if (mac_frame.to != config.get_self_id())
+			// accept point to point / broadcast
+			if (mac_frame.to != config.get_self_id() && mac_frame.to != ((1 << 4) - 1))
 				continue;
+
+			if (mac_frame.is_syn) {
+				control.transmission_start.store(true);
+				continue;
+			}
 
 			if (mac_frame.has_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
 			}
-			if (!mac_frame.bad_data) {
-				++data_packet;
-			}
+
 			if (!mac_frame.is_ack && !mac_frame.bad_data)
 				control.ack.store(m_receiver_window.receive_packet(mac_frame.data, mac_frame.seq));
 			if (m_receiver_window.get_num_collected() >= 50000) {
-				std::cerr << "----------------------------------------File "
-							 "Received!----------------------------------------\n";
+				config.log(
+					"--------------------------------------------------------------------------------File "
+					"Received!----------------------------------------------------------------------------"
+					"----");
 				config.timer_get();
 				std::vector<int> a;
 				m_receiver_window.collect(a);
-				std::cerr << "File size:  " << a.size() << "\n";
 				std::string file = "MAC_received.txt";
 				FILE* receive_fd = fopen((NOTEBOOK_DIR + file).c_str(), "wb");
 				if (!receive_fd) {
@@ -120,7 +122,6 @@ public:
 				finished = 1;
 			}
 		}
-		std::cerr << "Total data packets:   " << data_packet << "\n";
 	}
 
 private:

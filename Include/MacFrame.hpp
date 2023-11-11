@@ -44,6 +44,7 @@ struct MacFrame {
 
 		has_ack = frame[24];
 		is_ack = frame[25];
+		is_syn = frame[26];
 		if (!bad_data) {
 			for (int i = 32 + 8; i < frame.size(); ++i) {
 				data.push_back(frame[i]);
@@ -56,6 +57,7 @@ struct MacFrame {
 	int ack;
 	int is_ack;
 	int has_ack;
+	int is_syn;
 	int bad_data;
 	std::vector<int> data;
 };

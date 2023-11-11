@@ -55,7 +55,7 @@ jucer_project_settings(
   DISPLAY_THE_JUCE_SPLASH_SCREEN ON # Required for closed source applications without an Indie or Pro JUCE license
   PROJECT_TYPE "Console Application"
   BUNDLE_IDENTIFIER "com.yourcompany.Project2"
-  CXX_LANGUAGE_STANDARD "C++17"
+  CXX_LANGUAGE_STANDARD "C++20"
   HEADER_SEARCH_PATHS ${ASIO_PATH} "${CMAKE_CURRENT_LIST_DIR}/../Include/"
 )
 
@@ -66,6 +66,7 @@ jucer_project_files("Project2/Include"
 # Compile   Xcode     Binary    File
 #           Resource  Resource
   .         .         .         "Include/Config.hpp"  
+  .         .         .         "Include/Logger.hpp"  
   .         .         .         "Include/RingBuffer.hpp"
   .         .         .         "Include/SyncQueue.hpp"
   .         .         .         "Include/SenderSlidingWindow.hpp"

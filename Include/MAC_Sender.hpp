@@ -78,34 +78,54 @@ public:
 		static int ack_timeout = 0;
 		static int last_ack = -1;
 		static int cur_ack = -1;
+		static int syn_issued = 0;
+		static int syn_sent = 0;
+
+		if (control.transmission_start.load()) {
+			control.clock.fetch_add(1);
+		}
 
 		if (!packet) {
-			srand(config.get_self_id() + rand());
-			if (ack_timeout > slot * 10) {
-				m_sender_window.reset();
-				// std::cerr <<
-				// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
-				// 			 "!!!!!!!!!!!!!!!!!!!!\n";
-			}
-			bool succ = m_sender_window.consume_one(packet);
-			if (!succ) {
-				if (!control.busy.load())
-					++ack_timeout;
-				if (control.collision.load())
-					ack_timeout = 0;
-				if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
-					cur_ack = control.ack.load();
-					// std::cerr << " Send ACK:   " << cur_ack << "\n";
-					gen_ack(cur_ack);
-				}
-				if (control.ack.load() == last_ack) {
-					hold_channel = 0;
+			if (!control.transmission_start.load()) {
+				if (config.get_self_id() == 0) {
+					if (!syn_issued) {
+						gen_syn();
+						syn_issued = 1;
+					}
+					if (syn_sent) {
+						return 0;
+					}
+				} else {
 					return 0;
 				}
 			} else {
-				ack_timeout = 0;
-				cur_ack = control.ack.load();
-				modulate(packet->frame, packet->seq, cur_ack);
+				srand(config.get_self_id() + rand());
+				if (ack_timeout > slot * 10) {
+					m_sender_window.reset();
+					// std::cerr <<
+					// "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!RESET!!!!!!!!!!!!!!!!!!!!!!!!!!"
+					// 			 "!!!!!!!!!!!!!!!!!!!!\n";
+				}
+				bool succ = m_sender_window.consume_one(packet);
+				if (!succ) {
+					if (!control.busy.load())
+						++ack_timeout;
+					if (control.collision.load())
+						ack_timeout = 0;
+					if (control.ack.load() != last_ack && control.ack.load() != cur_ack) {
+						cur_ack = control.ack.load();
+						// std::cerr << " Send ACK:   " << cur_ack << "\n";
+						gen_ack(cur_ack);
+					}
+					if (control.ack.load() == last_ack) {
+						hold_channel = 0;
+						return 0;
+					}
+				} else {
+					ack_timeout = 0;
+					cur_ack = control.ack.load();
+					modulate(packet->frame, packet->seq, cur_ack);
+				}
 			}
 		} else {
 			if (!hold_channel && control.ack.load() != cur_ack) {
@@ -122,7 +142,7 @@ public:
 
 				// race!
 				if (counter < 0) {
-
+					config.log(std::format("+++++RETRY+++++ happened at {} ", control.clock.load()));
 					// if (control.previlege_node != config.get_self_id()) {
 					// 	m_sender_window.reset();
 					// 	if (m_sender_window.consume_one(packet)) {
@@ -147,17 +167,18 @@ public:
 			}
 		} else {
 			if (control.collision.load()) {
+				config.log(std::format("*****CLASH***** happened at {} ", control.clock.load()));
 				// collide!
 				hold_channel = 0;
 				if (last_ack == cur_ack) {
-					backoff <<= 1;
+					if (backoff <= 8) {
+						backoff <<= 1;
+					}
 					counter = (rand() % backoff) * slot;
 				} else {
 					counter = (rand() % backoff) * slot;
 				}
-				std::cerr
-					<< "***********************************CLASH**************************************\n";
-				std::cerr << "Counter:    " << counter << "\n";
+				config.log(std::format("Counter set to {} ", counter));
 				if (!jammed) {
 					for (int i = 0; i < count; ++i) {
 						buffer[i] = (float)(rand() % 50 + 50) / 100;
@@ -172,11 +193,15 @@ public:
 					buffer[index++] = signal[i];
 				}
 				if (start >= signal.size()) {
+					config.log(std::format("^^^^^SENT^^^^^ at {}", control.clock.load()));
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
 					counter = 0;
-					backoff = 1 << 2;
+					backoff = 2;
+					if (syn_issued && !control.transmission_start.load()) {
+						syn_sent = 1;
+					}
 				}
 				return index;
 			}
@@ -235,7 +260,7 @@ private:
 		signal.clear();
 		append_preamble(signal);
 
-		Frame frame = std::vector<int>(400);
+		Frame frame = std::vector<int>(500);
 		Frame length;
 		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
 		modulate_vec_4b5b_nrzi(length, signal);
@@ -271,6 +296,40 @@ private:
 		// modulate_vec(mac_frame, signal);
 		// modulate_vec(mac_frame, signal);
 		// modulate_vec(mac_frame, signal);
+		modulate_vec_4b5b_nrzi(mac_frame, signal);
+	}
+
+	void gen_syn()
+	{
+		signal.clear();
+		append_preamble(signal);
+
+		Frame frame = std::vector<int>(300);
+		Frame length;
+		append_num(frame.size() + 32, config.get_phy_frame_length_num_bits(), length);
+		modulate_vec_4b5b_nrzi(length, signal);
+
+		Frame mac_frame;
+		// broad cast
+		append_num((1 << 4) - 1, 4, mac_frame);
+		// from
+		append_num(config.get_self_id(), 4, mac_frame);
+		// seq
+		append_num(0, 8, mac_frame);
+		// ack
+		append_num(0, 8, mac_frame);
+		// control_section
+		Frame control_section = { 0, 0, 1, 0, 0, 0, 0, 0 };
+
+		// add control section
+		append_vec(control_section, mac_frame);
+		// crc for mac header
+		append_crc8(mac_frame);
+		// crc for payload
+		append_crc8(frame);
+		// add payload
+		append_vec(frame, mac_frame);
+
 		modulate_vec_4b5b_nrzi(mac_frame, signal);
 	}
 

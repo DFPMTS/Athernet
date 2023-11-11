@@ -92,16 +92,11 @@ void* Project2_main_loop(void*)
 	std::cerr << "MAC Adress:\n";
 	std::cin >> id;
 	Athernet::Config::get_instance().set_self_id(id);
-	int packet_size = 0;
-	std::cin >> packet_size;
-	Athernet::Config::get_instance().timer_set();
-	std::cerr << "Running...\n";
-
-	srand(static_cast<unsigned int>(time(0)));
-
+	int packet_size = 500;
 	auto physical_layer = &mac_layer->phy_layer;
-
 	adm.addAudioCallback(physical_layer);
+
+	std::cerr << "Running...\n";
 
 	// random_test(physical_layer, 1, 500);
 
@@ -171,6 +166,9 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char* argv[])
 	// }
 	// fclose(fd);
 	// return 0;
+
+	srand(static_cast<unsigned int>(time(0)));
+
 	auto message_manager = juce::MessageManager::getInstance();
 	message_manager->callFunctionOnMessageThread(Project2_main_loop, NULL);
 
