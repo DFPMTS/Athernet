@@ -187,8 +187,8 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
-				if (backoff > 6)
-					backoff = 6;
+				if (backoff > 8)
+					backoff = 8;
 				counter = (rand() % backoff) * slot;
 
 				config.log(std::format("Counter set to {} ", counter));
@@ -211,12 +211,8 @@ public:
 					packet.reset();
 					last_ack = cur_ack;
 					ack_flying = 0;
-
+					counter = slot >> 1;
 					backoff = 1;
-					if (++continuous_sent >= (config.get_window_size() >> 2)) {
-						hold_channel = 0;
-						counter = slot >> 1;
-					}
 					if (syn_issued && !control.transmission_start.load()) {
 						syn_sent = 1;
 					}
