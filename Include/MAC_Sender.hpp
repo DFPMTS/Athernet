@@ -168,9 +168,9 @@ public:
 				config.log(std::format("*****CLASH***** happened at {} ", control.clock.load()));
 				// collide!
 				hold_channel = 0;
-				if (backoff <= 8) {
-					backoff <<= 1;
-				}
+				backoff <<= 1;
+				if (backoff > 6)
+					backoff = 6;
 				counter = (rand() % backoff) * slot;
 
 				config.log(std::format("Counter set to {} ", counter));
