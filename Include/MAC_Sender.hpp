@@ -194,7 +194,7 @@ public:
 					start = 0;
 					packet.reset();
 					last_ack = cur_ack;
-					counter = slot >> 1;
+					counter = slot;
 					backoff = 1;
 					if (syn_issued && !control.transmission_start.load()) {
 						syn_sent = 1;
