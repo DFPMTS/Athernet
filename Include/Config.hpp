@@ -214,6 +214,7 @@ public:
 		auto time_used = std::chrono::duration_cast<std::chrono::duration<double>>(
 			std::chrono::system_clock::now() - start);
 		this->log(std::format("Time Used:  {}s", time_used.count()));
+		std::cerr << std::format("Time Used:  {}s", time_used.count()) << "\n";
 	}
 
 	void log(std::string item) { logger.append_log(std::move(item)); }
