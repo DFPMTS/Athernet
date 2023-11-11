@@ -32,7 +32,7 @@ public:
 	bool try_push(std::shared_ptr<PHY_Unit> phy_unit)
 	{
 		std::unique_lock lock { mutex };
-		producer.wait_for(lock, 100ms, [&]() { return window.size() < config.get_window_size(); });
+		producer.wait_for(lock, 10ms, [&]() { return window.size() < config.get_window_size(); });
 
 		if (window.size() < config.get_window_size()) {
 			window.push(phy_unit);

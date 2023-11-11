@@ -43,7 +43,6 @@ public:
 		while (running.load()) {
 			if (state == PhySendState::PROCESS_FRAME) {
 				if (!m_send_queue.pop(frame)) {
-					std::this_thread::yield();
 					continue;
 				}
 				assert(frame.size() <= config.get_phy_frame_payload_symbol_limit());
@@ -54,7 +53,6 @@ public:
 				state = PhySendState::SEND_SIGNAL;
 			} else if (state == PhySendState::SEND_SIGNAL) {
 				if (!m_sender_window.try_push(phy_unit)) {
-					std::this_thread::yield();
 					continue;
 				} else {
 					state = PhySendState::PROCESS_FRAME;
@@ -73,7 +71,7 @@ public:
 		static int hold_channel = 0;
 		static int trying_channel = 0;
 		static int jammed = 0;
-		static int slot = 15;
+		static int slot = 16;
 		static int backoff = 1 << 2;
 		static int ack_timeout = 0;
 		static int last_ack = -1;
