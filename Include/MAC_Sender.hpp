@@ -103,9 +103,12 @@ public:
 					if (num_sent[i] < min_num_sent)
 						min_num_sent = num_sent[i];
 				}
-				if (num_sent[config.get_self_id()] > min_num_sent + 5) {
-					// lock!
-					return 0;
+				int offset = num_sent[config.get_self_id()] - min_num_sent;
+				if (offset > 0) {
+					if (offset > 5)
+						offset = 5;
+					if (rand() % 10 < offset)
+						return 0;
 				}
 
 				srand(config.get_self_id() + rand());
