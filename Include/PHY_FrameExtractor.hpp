@@ -151,8 +151,8 @@ private:
 					// restore start
 					start = saved_start;
 					// discard
-					std::cerr << "                                    ";
-					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// std::cerr << "                                    ";
+					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					continue;
 				}
 
@@ -189,17 +189,17 @@ private:
 						}
 					} else {
 						// discard
-						std::cerr << "                                    ";
-						std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad"
-									 "frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+						// std::cerr << "                                    ";
+						// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad"
+						// 			 "frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 						MacFrame frame(bits, 1);
 						m_recv_queue.push(std::move(frame));
 						start = saved_start;
 					}
 				} else {
-					std::cerr << "                                    ";
-					std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad"
-								 "frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+					// std::cerr << "                                    ";
+					// std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Bad"
+					// 			 "frame!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
 					start = saved_start;
 				}
 

@@ -100,6 +100,8 @@ public:
 					"Received!----------------------------------------------------------------------------"
 					"----");
 				config.timer_get();
+				std::cerr << "+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+"
+							 "o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o\n";
 				std::vector<int> a;
 				m_receiver_window.collect(a);
 				std::string file = "MAC_received.txt";
