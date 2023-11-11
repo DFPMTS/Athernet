@@ -213,7 +213,7 @@ public:
 					ack_flying = 0;
 
 					backoff = 1;
-					if (++continuous_sent >= 3) {
+					if (++continuous_sent >= (config.get_window_size() >> 1)) {
 						hold_channel = 0;
 						counter = slot >> 1;
 					}
