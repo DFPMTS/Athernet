@@ -89,7 +89,7 @@ public:
 				continue;
 			}
 
-			if (mac_frame.has_ack && !mac_frame.bad_data) {
+			if (mac_frame.has_ack) {
 				m_sender_window.remove_acked(mac_frame.ack);
 			}
 
