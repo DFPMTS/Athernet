@@ -5,6 +5,7 @@
 #include <cassert>
 #include <format>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace Athernet {
