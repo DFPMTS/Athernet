@@ -100,7 +100,7 @@ void* Project2_main_loop(void*)
 	std::cerr << "MAC Adress:\n";
 	std::cerr << id << "\n";
 	Athernet::Config::get_instance().set_self_id(id);
-	int packet_size = 400;
+	int packet_size = 500;
 	auto physical_layer = &mac_layer->phy_layer;
 	adm.addAudioCallback(physical_layer);
 
