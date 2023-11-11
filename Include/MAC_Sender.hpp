@@ -170,14 +170,11 @@ public:
 				config.log(std::format("*****CLASH***** happened at {} ", control.clock.load()));
 				// collide!
 				hold_channel = 0;
-				if (last_ack == cur_ack) {
-					if (backoff <= 8) {
-						backoff <<= 1;
-					}
-					counter = (rand() % backoff) * slot;
-				} else {
-					counter = (rand() % backoff) * slot;
+				if (backoff <= 8) {
+					backoff <<= 1;
 				}
+				counter = (rand() % backoff) * slot;
+
 				config.log(std::format("Counter set to {} ", counter));
 				if (!jammed) {
 					for (int i = 0; i < count; ++i) {
@@ -198,7 +195,7 @@ public:
 					packet.reset();
 					last_ack = cur_ack;
 					counter = 0;
-					backoff = 2;
+					backoff = 1;
 					if (syn_issued && !control.transmission_start.load()) {
 						syn_sent = 1;
 					}
