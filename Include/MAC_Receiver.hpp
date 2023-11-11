@@ -75,8 +75,10 @@ public:
 
 			config.log("----------------------------------------------------------------------");
 
-			if (!mac_frame.bad_data)
+			if (!mac_frame.bad_data) {
 				control.previlege_node.store(mac_frame.from);
+				control.sent[mac_frame.from].fetch_add(1);
+			}
 
 			// accept point to point / broadcast
 			if (mac_frame.to != config.get_self_id() && mac_frame.to != ((1 << 4) - 1))
@@ -94,7 +96,6 @@ public:
 
 			if (!mac_frame.is_ack && !mac_frame.bad_data) {
 				control.ack.store(m_receiver_window.receive_packet(mac_frame.data, mac_frame.seq));
-				control.sent[mac_frame.from].fetch_add(1);
 			}
 			if (m_receiver_window.get_num_collected() >= 50000) {
 				config.log(
