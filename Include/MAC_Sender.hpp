@@ -114,7 +114,6 @@ public:
 				srand(config.get_self_id() + rand());
 				if (ack_timeout > slot * 10) {
 					m_sender_window.reset();
-					last_ack = -1;
 					ack_timeout = 0;
 					++ack_timeout_times;
 				}
