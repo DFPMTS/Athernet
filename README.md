@@ -1,4 +1,4 @@
-# Athernet Project 1
+# Athernet Project 2 X
 ## TODO
-1. move from CRC8 to CRC10? CRC13? CRC16?
-2. change busy waiting to condition variable, at least for classes using SyncQueue
+1. Are there better ways for fair time sharing?
+2. Clean up code.
