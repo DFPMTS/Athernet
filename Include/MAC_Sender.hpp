@@ -150,6 +150,8 @@ public:
 				// collide!
 				hold_channel = 0;
 				backoff <<= 1;
+				if (backoff > 3)
+					backoff = 3;
 				counter = (rand() % backoff + 1) * slot;
 				if (!jammed) {
 					for (int i = 0; i < count; ++i) {
