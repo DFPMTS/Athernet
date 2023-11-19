@@ -110,7 +110,7 @@ void* Project2_main_loop(void*)
 	// 	std::cerr << i << " -> " << y << " -> " << Athernet::Config::get_instance().get_map_5b_4b(y) << "\n";
 	// }
 
-	std::string file = "INPUT.bin";
+	std::string file = "INPUT4to3.bin";
 	int c;
 	std::vector<int> text;
 
