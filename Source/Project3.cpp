@@ -46,81 +46,6 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 	fclose(sent_fd);
 }
 
-pcpp::MacAddress default_gateway("02:00:00:00:00:00");
-
-pcpp::IPv4Address my_ip;
-
-std::map<pcpp::IPv4Address, pcpp::MacAddress> ip_to_mac;
-
-pcpp::MacAddress get_mac_by_ip(pcpp::IPv4Address dest_ip)
-{
-	if (ip_to_mac.count(dest_ip)) {
-		return ip_to_mac[dest_ip];
-	} else {
-		return default_gateway;
-	}
-}
-
-std::vector<int> bytes_to_bits(const uint8_t* a, int len)
-{
-	std::vector<int> bits;
-	for (int i = 0; i < len; ++i) {
-		int x = a[i];
-		for (int i = 0; i < 4; ++i) {
-			bits.push_back((x >> i) & 1);
-		}
-	}
-	return bits;
-}
-
-template <typename T>
-void ping(Athernet::PHY_Layer<T>* physical_layer, std::string dest_ip, int len = 100, int times = 4,
-	double interval = 1.0)
-{
-	using namespace std::chrono;
-	using namespace Athernet;
-	pcpp::Packet ping_packet;
-
-	Config& config = Config::get_instance();
-
-	if (dest_ip == config.get_self_ip()) {
-		std::cerr << "You are pinging yourself!";
-		return;
-	}
-
-	auto mac_addr_src = config.get_mac_by_ip(config.get_self_ip());
-	auto mac_addr_dest = config.get_mac_by_ip(dest_ip);
-
-	// pcpp::EthLayer eth_layer(mac_addr_src, mac_addr_dest, PCPP_ETHERTYPE_IP);
-
-	pcpp::IPv4Layer ipv4_layer(my_ip, dest_ip);
-	ipv4_layer.getIPv4Header()->timeToLive = 64;
-
-	std::vector<uint8_t> icmp_data(len);
-
-	pcpp::IcmpLayer icmp_layer;
-	// ping_packet.addLayer(&eth_layer);
-	ping_packet.addLayer(&ipv4_layer);
-	ping_packet.addLayer(&icmp_layer);
-
-	for (int seq = 0; seq < times; ++seq) {
-		uint64_t timestamp = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-		icmp_layer.setEchoRequestData(0, (uint16_t)seq, timestamp, icmp_data.data(), icmp_data.size());
-		ping_packet.computeCalculateFields();
-
-		auto raw_ping = ping_packet.getRawPacket();
-		auto bits = bytes_to_bits(raw_ping->getRawData(), raw_ping->getRawDataLen());
-
-		for (int i = 0; i < 4; ++i) {
-			bits.push_back((mac_addr_dest >> i) & 1);
-		}
-
-		physical_layer->send_frame(bits);
-
-		std::this_thread::sleep_for(milliseconds((int)(interval * 1000)));
-	}
-}
-
 void* Project2_main_loop(void*)
 {
 	// Use RAII pattern to take care of initializing/shutting down JUCE
@@ -187,7 +112,7 @@ void* Project2_main_loop(void*)
 
 	// random_test(physical_layer, 1, 500);
 
-	ping(physical_layer, "172.18.0.1");
+	mac_layer->ping("172.18.0.2", 0, 0);
 
 	std::string s;
 	while (true) {
@@ -306,7 +231,7 @@ int main()
 
 	uint8_t icmp_data[] = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 };
 	pcpp::IcmpLayer icmp_layer;
-	icmp_layer.setEchoRequestData(0, 0, -1, icmp_data, 16);
+	icmp_layer.setEchoRequestData(1, 200, -1, icmp_data, 16);
 
 	test_packet.addLayer(&eth_layer);
 	test_packet.addLayer(&ipv4_layer);
@@ -320,7 +245,7 @@ int main()
 	}
 	std::cerr << "\n";
 
-	// tap_dev->sendPacket(&test_packet);
+	tap_dev->sendPacket(&test_packet);
 
 	// auto eth_dev = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(eth_name);
 	// if (!eth_dev->open()) {

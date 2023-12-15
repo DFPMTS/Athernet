@@ -18,7 +18,7 @@ public:
 
 	int get_num_collected() { return collected; }
 
-	void collect(std::vector<int>& file)
+	void collect(std::vector<std::vector<int>>& file)
 	{
 		file = std::move(stream);
 		stream.clear();
@@ -47,9 +47,11 @@ public:
 			while (window[window_start]) {
 				ever_received = 1;
 				window[window_start] = 0;
-				std::copy(std::begin(packets[window_start]), std::end(packets[window_start]),
-					std::back_inserter(stream));
-				collected += packets[window_start].size();
+				// std::copy(std::begin(packets[window_start]), std::end(packets[window_start]),
+				// 	std::back_inserter(stream));
+				stream.push_back(packets[window_start]);
+
+				collected += 1;
 				if (++window_start >= config.get_seq_limit())
 					window_start -= config.get_seq_limit();
 			}
@@ -66,7 +68,7 @@ private:
 	Config& config;
 	std::vector<int> window;
 	std::vector<std::vector<int>> packets;
-	std::vector<int> stream;
+	std::vector<std::vector<int>> stream;
 	int collected = 0;
 	int window_start = 0;
 	int last_received = -1;

@@ -25,6 +25,7 @@ elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
   # This is my computer specific setting
   list(APPEND CMAKE_MODULE_PATH "/Users/dfpmts/FRUT/prefix/FRUT/cmake")  
   set(JUCE_MODULES_GLOBAL_PATH "/Users/dfpmts/JUCE/modules/")
+   add_compile_options(-fexperimental-library)
   
 else()
 
@@ -82,7 +83,6 @@ jucer_project_files("Project3/Include"
   .         .         .         "Include/MAC_Sender.hpp"
   .         .         .         "Include/MAC_Receiver.hpp"  
   .         .         .         "Include/Protocol_Control.hpp"
-  .         .         .         "Include/IP_Layer.hpp"
 )
 
 # --------------------------------Source----------------------------------- #
@@ -228,6 +228,10 @@ elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
   jucer_export_target(
     "Xcode (macOS)"
+    EXTERNAL_LIBRARIES_TO_LINK
+    "PcapPlusPlus::Pcap++"
+    "PcapPlusPlus::Packet++"
+    "PcapPlusPlus::Common++"
   )
 
   jucer_export_target_configuration(

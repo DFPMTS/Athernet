@@ -140,7 +140,7 @@ public:
 		{
 			std::ifstream fin(NOTEBOOK_DIR + "ip_addr.txt"s);
 			if (!fin) {
-				std::cerr << "Fail to read mac_addr.txt!\n";
+				std::cerr << "Fail to read ip_addr.txt!\n";
 				assert(0);
 			}
 			fin >> ip_address;
@@ -201,6 +201,12 @@ public:
 
 	void set_self_ip(std::string ip) { ip_address = ip; }
 	std::string get_self_ip() { return ip_address; }
+
+	std::string get_mac_by_id(int id)
+	{
+		assert(id >= 0 && id < 16);
+		return "02:00:00:00:00:0"s + std::format("{:x}", id);
+	}
 
 	int get_mac_by_ip(std::string ip)
 	{

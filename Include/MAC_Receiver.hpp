@@ -19,14 +19,14 @@ template <typename T> class MAC_Receiver {
 	using Frame = std::vector<int>;
 
 public:
-	MAC_Receiver(Protocol_Control& mac_control, SyncQueue<MacFrame>& recv_queue,
+	MAC_Receiver(Protocol_Control& mac_control, SyncQueue<Frame>& recv_queue,
 		SenderSlidingWindow& sender_window, ReceiverSlidingWindow& receiver_window)
 		: config { Athernet::Config::get_instance() }
 		, control { mac_control }
 		, m_recv_queue { recv_queue }
 		, m_sender_window { sender_window }
 		, m_receiver_window { receiver_window }
-		, frame_extractor(m_recv_buffer, m_recv_queue, m_decoder_queue, mac_control)
+		, frame_extractor(m_recv_buffer, m_phy_queue, m_decoder_queue, mac_control)
 	// , decoder(m_decoder_queue, m_recv_queue)
 	{
 		display_running.store(true);
@@ -59,7 +59,7 @@ public:
 		MacFrame mac_frame;
 		int finished = 0;
 		while (display_running.load()) {
-			if (!m_recv_queue.pop(mac_frame)) {
+			if (!m_phy_queue.pop(mac_frame)) {
 				continue;
 			}
 
@@ -96,34 +96,12 @@ public:
 			if (!mac_frame.is_ack && !mac_frame.bad_data) {
 				control.ack.store(m_receiver_window.receive_packet(mac_frame.data, mac_frame.seq));
 			}
-			if (m_receiver_window.get_num_collected() >= 50000) {
-				config.log(
-					"--------------------------------------------------------------------------------File "
-					"Received!----------------------------------------------------------------------------"
-					"----");
-				config.timer_get();
-				std::cerr << "+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+"
-							 "o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o+o\n";
-				std::vector<int> a;
-				m_receiver_window.collect(a);
-				std::string file = "MAC_received.txt";
-				FILE* receive_fd = fopen((NOTEBOOK_DIR + file).c_str(), "wb");
-				if (!receive_fd) {
-					std::cerr << "Unable to open " << file << "!\n";
-					assert(0);
+			if (m_receiver_window.get_num_collected() > 0) {
+				std::vector<std::vector<int>> mac_frames;
+				m_receiver_window.collect(mac_frames);
+				for (auto& x : mac_frames) {
+					m_recv_queue.push(std::move(x));
 				}
-				for (int i = 0; i < 50000; i += 8) {
-					int c = 0;
-					for (int j = 0; j < 8; ++j) {
-						c += a[i + j] << j;
-					}
-					fprintf(receive_fd, "%c", c);
-					if (i % 10000 == 0) {
-						fflush(receive_fd);
-					}
-				}
-				fclose(receive_fd);
-				finished = 1;
 			}
 		}
 	}
@@ -131,7 +109,8 @@ public:
 private:
 	Config& config;
 	Protocol_Control& control;
-	SyncQueue<MacFrame>& m_recv_queue;
+	SyncQueue<Frame>& m_recv_queue;
+	SyncQueue<MacFrame> m_phy_queue;
 	SenderSlidingWindow& m_sender_window;
 	ReceiverSlidingWindow& m_receiver_window;
 
