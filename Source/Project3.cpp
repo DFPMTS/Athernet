@@ -46,6 +46,15 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 	fclose(sent_fd);
 }
 
+void ping_async(Athernet::MAC_Layer* mac_layer, std::string ip, int times, double interval, int length)
+{
+	using namespace std::chrono;
+	for (int i = 0; i < times; ++i) {
+		mac_layer->ping(ip, 0, i);
+		std::this_thread::sleep_for(milliseconds((int)(interval * 1000)));
+	}
+}
+
 void* Project2_main_loop(void*)
 {
 	// Use RAII pattern to take care of initializing/shutting down JUCE
@@ -112,13 +121,6 @@ void* Project2_main_loop(void*)
 
 	// random_test(physical_layer, 1, 500);
 
-#ifdef WIN
-	for (int i = 0; i < 10; ++i) {
-		mac_layer->ping("172.18.0.2", 0, i);
-		std::this_thread::sleep_for(1s);
-	}
-#endif
-
 	std::string s;
 	while (true) {
 		std::cin >> s;
@@ -130,6 +132,33 @@ void* Project2_main_loop(void*)
 			std::string file;
 			std::cin >> file;
 			Athernet::LT_Send(physical_layer, file);
+		} else if (s == "ping") {
+			std::string ip;
+			std::cin >> ip;
+			if (!ip.size()) {
+				std::cerr << "Wrong usage!\n";
+				continue;
+			}
+			std::string options;
+			getline(std::cin, options);
+			std::istringstream sin(options);
+			std::string opt;
+
+			int times = 10;
+			double interval;
+			int length = 10;
+
+			while (sin >> opt) {
+				if (opt == '-n') {
+					sin >> times;
+				} else if (opt == '-i') {
+					sin >> interval;
+				} else if (opt == "-l") {
+					sin >> length;
+				}
+			}
+			std::async(ping_async, mac_layer.get(), ip, times, interval, length);
+
 		} else if (s == "e") {
 			break;
 		}

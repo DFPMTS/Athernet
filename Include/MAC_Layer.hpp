@@ -62,21 +62,8 @@ public:
 		auto raw_ping = ping_packet.getRawPacket();
 		auto bits = bytes_to_bits(raw_ping->getRawData(), raw_ping->getRawDataLen());
 
-		// for (int i = 0; i < raw_ping->getRawDataLen(); ++i) {
-		// 	std::cerr << (int)raw_ping->getRawData()[i] << " ";
-		// }
-		// std::cerr << "\n";
-
-		auto payload = bits;
-		std::vector<uint8_t> bytes;
-		for (int i = 0; i < payload.size(); i += 8) {
-			int x = 0;
-			for (int j = 0; j < 8; ++j) {
-				x += (payload[i + j] << j);
-			}
-			bytes.push_back(x);
-		}
-
+		std::cerr << control.clock.load() << "\n";
+		std::cerr << bits.size() << "\n";
 		// indicate that this packet has to be processed directly
 		bits.push_back(0);
 		m_sender.push_frame(bits);
