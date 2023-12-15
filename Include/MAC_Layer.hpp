@@ -62,10 +62,10 @@ public:
 		auto raw_ping = ping_packet.getRawPacket();
 		auto bits = bytes_to_bits(raw_ping->getRawData(), raw_ping->getRawDataLen());
 
-		for (int i = 0; i < raw_ping->getRawDataLen(); ++i) {
-			std::cerr << (int)raw_ping->getRawData()[i] << " ";
-		}
-		std::cerr << "\n";
+		// for (int i = 0; i < raw_ping->getRawDataLen(); ++i) {
+		// 	std::cerr << (int)raw_ping->getRawData()[i] << " ";
+		// }
+		// std::cerr << "\n";
 
 		auto payload = bits;
 		std::vector<uint8_t> bytes;
@@ -135,13 +135,14 @@ public:
 					auto header_len = icmp_layer->getHeaderLen();
 					auto header_ptr = icmp_layer->getIcmpHeader();
 
-					std::cerr << "Header Len: " << header_len << "\n";
-					std::cerr << "Type: " << (int)header_ptr->type << "\n";
-					std::cerr << "Code: " << (int)header_ptr->code << "\n";
-					std::cerr << "Checksum: " << pcpp::netToHost16(header_ptr->checksum) << "\n";
+					// std::cerr << "Header Len: " << header_len << "\n";
+					// std::cerr << "Type: " << (int)header_ptr->type << "\n";
+					// std::cerr << "Code: " << (int)header_ptr->code << "\n";
+					// std::cerr << "Checksum: " << pcpp::netToHost16(header_ptr->checksum) << "\n";
 
 					if (header_ptr->type == pcpp::ICMP_ECHO_REQUEST) {
-
+						std::cerr
+							<< "-------------------------------REQUEST-------------------------------\n";
 						auto echo_request = icmp_layer->getEchoRequestData();
 
 						int id = pcpp::netToHost16(echo_request->header->id);
@@ -159,9 +160,11 @@ public:
 						}
 
 						ping(src_ip.toString(), id, seq, true, timestamp, req_data);
-
+						std::cerr
+							<< "---------------------------------------------------------------------\n";
 					} else if (header_ptr->type == pcpp::ICMP_ECHO_REPLY) {
-
+						std::cerr
+							<< "--------------------------------REPLY--------------------------------\n";
 						auto echo_reply = icmp_layer->getEchoReplyData();
 
 						int id = pcpp::netToHost16(echo_reply->header->id);
@@ -176,6 +179,8 @@ public:
 								- milliseconds(timestamp)
 								  << "\n";
 						std::cerr << "Data Len: " << echo_reply->dataLength << "\n";
+						std::cerr
+							<< "---------------------------------------------------------------------\n";
 					}
 				}
 			}
