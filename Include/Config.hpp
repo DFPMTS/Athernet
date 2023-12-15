@@ -7,6 +7,7 @@
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <ratio>
 #include <vector>
 
@@ -135,6 +136,18 @@ public:
 			std::ofstream fout(NOTEBOOK_DIR + "packet_length.txt"s);
 			fout << phy_frame_payload_symbol_limit;
 		}
+
+		{
+			std::ifstream fin(NOTEBOOK_DIR + "ip_addr.txt"s);
+			if (!fin) {
+				std::cerr << "Fail to read mac_addr.txt!\n";
+				assert(0);
+			}
+			fin >> ip_address;
+		}
+
+		ip_to_mac["172.18.0.1"] = 0;
+		ip_to_mac["172.18.0.2"] = 1;
 	}
 
 	// disable copy constructor / copy assignment operator
@@ -186,8 +199,20 @@ public:
 	void set_self_id(int addr) { mac_address = addr; }
 	int get_self_id() { return mac_address; }
 
-	float get_collision_threshold() const { return 0.0002f; }
-	// float get_collision_threshold() const { return 0.5; }
+	void set_self_ip(std::string ip) { ip_address = ip; }
+	std::string get_self_ip() { return ip_address; }
+
+	int get_mac_by_ip(std::string ip)
+	{
+		if (ip_to_mac.count(ip)) {
+			return ip_to_mac[ip];
+		} else {
+			return default_gateway;
+		}
+	}
+
+	// float get_collision_threshold() const { return 0.0002f; }
+	float get_collision_threshold() const { return 0.0005; }
 
 	int get_window_size() const { return 3; }
 
@@ -241,6 +266,9 @@ private:
 	int phy_coding_overhead = 7 + 19;
 
 	int mac_address = -1;
+	std::string ip_address = "";
+	int default_gateway = 0;
+	std::map<std::string, int> ip_to_mac;
 
 	int map_4b_5b[16] = { 30, 9, 20, 21, 10, 11, 14, 15, 18, 19, 22, 23, 26, 27, 28, 29 };
 	int map_5b_4b[32] = {
