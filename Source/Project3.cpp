@@ -149,9 +149,9 @@ void* Project2_main_loop(void*)
 			int length = 10;
 
 			while (sin >> opt) {
-				if (opt == '-n') {
+				if (opt == "-n") {
 					sin >> times;
-				} else if (opt == '-i') {
+				} else if (opt == "-i") {
 					sin >> interval;
 				} else if (opt == "-l") {
 					sin >> length;
