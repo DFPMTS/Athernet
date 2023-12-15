@@ -151,10 +151,6 @@ public:
 						std::cerr << "Request:  \n";
 						std::cerr << "Id:  " << id << "\n";
 						std::cerr << "Seq: " << seq << "\n";
-						std::cerr << "Time: "
-								  << duration_cast<milliseconds>(system_clock::now().time_since_epoch())
-								- milliseconds(timestamp)
-								  << "\n";
 						std::cerr << "Data Len: " << echo_request->dataLength << "\n";
 
 						std::vector<uint8_t> req_data;
@@ -165,6 +161,21 @@ public:
 						ping(src_ip.toString(), id, seq, true, timestamp, req_data);
 
 					} else if (header_ptr->type == pcpp::ICMP_ECHO_REPLY) {
+
+						auto echo_reply = icmp_layer->getEchoRequestData();
+
+						int id = pcpp::netToHost16(echo_reply->header->id);
+						int seq = pcpp::netToHost16(echo_reply->header->sequence);
+						uint64_t timestamp = echo_reply->header->timestamp;
+
+						std::cerr << "Reply:  \n";
+						std::cerr << "Id:  " << id << "\n";
+						std::cerr << "Seq: " << seq << "\n";
+						std::cerr << "Time: "
+								  << duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+								- milliseconds(timestamp)
+								  << "\n";
+						std::cerr << "Data Len: " << echo_reply->dataLength << "\n";
 					}
 				}
 			}
