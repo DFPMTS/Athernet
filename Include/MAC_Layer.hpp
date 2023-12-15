@@ -103,8 +103,8 @@ public:
 					bytes.push_back(x);
 				}
 
-				pcpp::EthLayer eth_layer(pcpp::MacAddress(config.get_mac_by_id(config.get_self_id())),
-					config.get_mac_by_id(config.get_self_id() ^ 1), PCPP_ETHERTYPE_IP);
+				pcpp::EthLayer eth_layer(config.get_mac_by_id(config.get_self_id() ^ 1),
+					config.get_mac_by_id(config.get_self_id()), PCPP_ETHERTYPE_IP);
 
 				pcpp::Packet mac_header;
 				mac_header.addLayer(&eth_layer);
@@ -162,7 +162,7 @@ public:
 
 					} else if (header_ptr->type == pcpp::ICMP_ECHO_REPLY) {
 
-						auto echo_reply = icmp_layer->getEchoRequestData();
+						auto echo_reply = icmp_layer->getEchoReplyData();
 
 						int id = pcpp::netToHost16(echo_reply->header->id);
 						int seq = pcpp::netToHost16(echo_reply->header->sequence);

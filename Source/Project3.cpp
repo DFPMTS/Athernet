@@ -112,7 +112,12 @@ void* Project2_main_loop(void*)
 
 	// random_test(physical_layer, 1, 500);
 
-	mac_layer->ping("172.18.0.2", 0, 0);
+#ifdef WIN
+	for (int i = 0; i < 10; ++i) {
+		mac_layer->ping("172.18.0.2", 0, i);
+		std::this_thread::sleep_for(1s);
+	}
+#endif
 
 	std::string s;
 	while (true) {
