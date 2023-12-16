@@ -1,4 +1,5 @@
 #include "Config.hpp"
+#include "IP_Layer.hpp"
 #include "JuceHeader.h"
 #include "LT_Encode.hpp"
 #include "MAC_Layer.hpp"
@@ -46,12 +47,46 @@ void random_test(Athernet::PHY_Layer<T>* physical_layer, int num_packets, int pa
 	fclose(sent_fd);
 }
 
-void ping_async(Athernet::MAC_Layer* mac_layer, std::string ip, int times, double interval, int length)
+void ping_async(Athernet::IP_Layer* ip_layer, std::string ip, int times, double interval, int length,
+	std::atomic_bool& interrupt)
 {
 	using namespace std::chrono;
+
+	bool ended = false;
+	int sent = 0;
 	for (int i = 0; i < times; ++i) {
-		mac_layer->ping(ip, 0, i);
-		std::this_thread::sleep_for(milliseconds((int)(interval * 1000)));
+		ip_layer->ping(ip, 0, i);
+		++sent;
+		auto started_waiting = system_clock::now();
+		while (system_clock::now() - started_waiting < milliseconds((int)(interval * 1000))) {
+			if (interrupt.load()) {
+				ended = true;
+				break;
+			}
+			std::this_thread::sleep_for(10ms);
+		}
+		if (ended) {
+			break;
+		}
+	}
+	// ! this is NOT thread safe, but I am lazy
+	std::this_thread::sleep_for(500ms);
+	auto RTT_results = std::move(ip_layer->RTTs);
+
+	std::cerr << std::format("Ping statistics for {}:\n", ip);
+	std::cerr << std::format("\tPackets: Sent = {}, Received = {}, Lost = {}({} % loss),\n", sent,
+		RTT_results.size(), sent - RTT_results.size(), (sent - RTT_results.size()) * 100 / sent);
+	if (RTT_results.size()) {
+		uint64_t max_RTT = 0, min_RTT = 1000000, aver_RTT = 0;
+		for (auto x : RTT_results) {
+			max_RTT = std::max(max_RTT, x);
+			min_RTT = std::min(min_RTT, x);
+			aver_RTT += x;
+		}
+		aver_RTT /= RTT_results.size();
+		std::cerr << "Approximate round trip times in milli-seconds:\n";
+		std::cerr << std::format(
+			"\tMinimum = {}ms, Maximum = {}ms, Average = {}ms \n", min_RTT, max_RTT, aver_RTT);
 	}
 }
 
@@ -68,7 +103,7 @@ void* Project2_main_loop(void*)
 	device_setup.bufferSize = 64;
 
 	// auto physical_layer = std::make_unique<Athernet::PHY_Layer<float>>();
-	auto mac_layer = std::make_unique<Athernet::MAC_Layer>();
+	auto ip_layer = std::make_unique<Athernet::IP_Layer>();
 
 	auto device_type = adm.getCurrentDeviceTypeObject();
 
@@ -114,7 +149,7 @@ void* Project2_main_loop(void*)
 	std::cerr << id << "\n";
 	Athernet::Config::get_instance().set_self_id(id);
 	int packet_size = 600;
-	auto physical_layer = &mac_layer->phy_layer;
+	auto physical_layer = &ip_layer->mac_layer.phy_layer;
 	adm.addAudioCallback(physical_layer);
 
 	std::cerr << "Running...\n";
@@ -122,6 +157,11 @@ void* Project2_main_loop(void*)
 	// random_test(physical_layer, 1, 500);
 
 	std::string s;
+	std::atomic_bool ping_interrupt;
+	std::jthread ping_thread;
+
+	ping_interrupt.store(false);
+	// ping_async(ip_layer.get(), "1.1.1.1", 5, 1, 10, std::ref(ping_interrupt));
 	while (true) {
 		std::cin >> s;
 		if (s == "r") {
@@ -145,7 +185,7 @@ void* Project2_main_loop(void*)
 			std::string opt;
 
 			int times = 10;
-			double interval;
+			double interval = 1;
 			int length = 10;
 
 			while (sin >> opt) {
@@ -157,9 +197,13 @@ void* Project2_main_loop(void*)
 					sin >> length;
 				}
 			}
-			std::async(ping_async, mac_layer.get(), ip, times, interval, length);
+			ping_interrupt.store(false);
+			ping_thread = std::jthread(
+				ping_async, ip_layer.get(), ip, times, interval, length, std::ref(ping_interrupt));
+			// ping_async(mac_layer.get(), ip, times, interval, length, ping_interrupt);
 
 		} else if (s == "e") {
+			ping_interrupt.store(true);
 			break;
 		}
 	}

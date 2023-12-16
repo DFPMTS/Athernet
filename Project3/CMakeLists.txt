@@ -19,6 +19,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   set(JUCE_MODULES_GLOBAL_PATH "${CMAKE_CURRENT_LIST_DIR}/../../JUCE/modules")
   set(ASIO_PATH "${CMAKE_CURRENT_LIST_DIR}/../../asiosdk_2.3.3_2019-06-14/common")
   add_compile_definitions(WIN)
+  add_compile_definitions(NOMINMAX)
 
 elseif (CMAKE_SYSTEM_NAME MATCHES "Darwin")
 
@@ -83,6 +84,7 @@ jucer_project_files("Project3/Include"
   .         .         .         "Include/MAC_Sender.hpp"
   .         .         .         "Include/MAC_Receiver.hpp"  
   .         .         .         "Include/Protocol_Control.hpp"
+  .         .         .         "Include/IP_Layer.hpp"
 )
 
 # --------------------------------Source----------------------------------- #

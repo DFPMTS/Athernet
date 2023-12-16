@@ -148,6 +148,8 @@ public:
 
 		ip_to_mac["172.18.0.1"] = 0;
 		ip_to_mac["172.18.0.2"] = 1;
+
+		mac_address = ip_to_mac[ip_address];
 	}
 
 	// disable copy constructor / copy assignment operator
@@ -216,6 +218,8 @@ public:
 			return default_gateway;
 		}
 	}
+
+	bool is_router() { return get_self_id() == 0; }
 
 	// float get_collision_threshold() const { return 0.0002f; }
 	float get_collision_threshold() const { return 0.0005; }
