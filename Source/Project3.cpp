@@ -208,6 +208,8 @@ void* Project2_main_loop(void*)
 		}
 	}
 
+	// std::this_thread::sleep_for(10s);
+
 	adm.removeAudioCallback(physical_layer);
 
 	return NULL;

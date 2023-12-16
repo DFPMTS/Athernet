@@ -13,6 +13,7 @@ namespace Athernet {
 using Bytes = std::vector<uint8_t>;
 
 inline void wlan_loop(pcpp::RawPacket* pPacket, pcpp::PcapLiveDevice* pDevice, void* ip_layer_void);
+inline void hotspot_loop(pcpp::RawPacket* pPacket, pcpp::PcapLiveDevice* pDevice, void* ip_layer_void);
 
 class IP_Layer {
 	using IpAndId = std::pair<std::string, int>;
@@ -35,13 +36,13 @@ public:
 		}
 
 		auto dev_list = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDevicesList();
-		std::string wifi_name;
+		std::string wifi_name, hotspot_name;
 		for (auto dev : dev_list) {
 			std::cerr << dev->getName() << "   MAC: " << dev->getMacAddress()
 					  << "   IP: " << dev->getIPv4Address() << "   " << dev->getDesc() << "\n";
-			// if (dev->getDesc() == "Intel(R) Ethernet Controller (3) I225-V") {
-			// 	eth_name = dev->getName();
-			// }
+			if (dev->getDesc() == "Microsoft Wi-Fi Direct Virtual Adapter #2") {
+				hotspot_name = dev->getName();
+			}
 			if (dev->getDesc() == "Intel(R) Wi-Fi 6E AX210 160MHz") {
 				wifi_name = dev->getName();
 			}
@@ -75,33 +76,23 @@ public:
 					wlan_dev->startCapture(wlan_loop, this);
 				}
 			}
-			// {
+			{
+				hotspot_dev = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDeviceByName(hotspot_name);
+				if (!hotspot_dev->open()) {
+					std::cerr << "Cannot open HOTSPOT !\n";
+				} else {
+					hotspot_on = true;
+					hotspot_addr = hotspot_dev->getIPv4Address();
+					std::cerr << hotspot_addr << "\n";
+					hotspot_network = pcpp::IPv4Network(hotspot_addr.toString() + "/24"s);
+					hotspot_mac = hotspot_dev->getMacAddress();
+					hotspot_peer_mac = pcpp::MacAddress("e4:a4:71:63:1c:26");
 
-			// 	std::string addr;
-			// 	std::ifstream fin(NOTEBOOK_DIR + "hotspot.txt"s);
-			// 	if (!fin) {
-			// 		std::cerr << "Fail to read wlan.txt!\n";
-			// 		assert(0);
-			// 	}
-			// 	fin >> addr;
-			// 	hotspot_addr = pcpp::IPv4Address(addr);
-
-			// 	std::string mask;
-			// 	fin = std::ifstream(NOTEBOOK_DIR + "hotspot_mask.txt"s);
-			// 	if (!fin) {
-			// 		std::cerr << "Fail to read hotspot_mask.txt!\n";
-			// 		assert(0);
-			// 	}
-			// 	fin >> mask;
-			// 	hotspot_network = pcpp : IPv4Network(addr + "/"s + mask);
-
-			// 	hotspot_dev = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDeviceByIp(wlan_addr);
-			// 	if (!hotspot_dev->open()) {
-			// 		std::cerr << "Cannot open hotspot !\n";
-			// 	} else {
-			// 		hotspot_on = true;
-			// 	}
-			// }
+					auto incoming_filter = pcpp::IPFilter(athernet_addr.toString(), pcpp::Direction::DST, 24);
+					hotspot_dev->setFilter(incoming_filter);
+					hotspot_dev->startCapture(hotspot_loop, this);
+				}
+			}
 		}
 	}
 
@@ -111,6 +102,9 @@ public:
 		athernet_thead.join();
 		if (wlan_on) {
 			wlan_dev->stopCapture();
+		}
+		if (hotspot_on) {
+			hotspot_dev->stopCapture();
 		}
 	}
 
@@ -175,7 +169,7 @@ public:
 	void route(std::string dest_ip, Bytes ip_packet)
 	{
 		pcpp::IPv4Address dest_ip_addr(dest_ip);
-
+		std::cerr << dest_ip << "\n";
 		if (!config.is_router()) {
 			// * host
 			if (dest_ip == config.get_self_ip()) {
@@ -198,6 +192,8 @@ public:
 				auto bits = bytes_to_bits(payload);
 				bits.push_back(0);
 				mac_layer.m_sender.push_frame(bits);
+			} else if (dest_ip_addr.matchNetwork(hotspot_network)) {
+				send_to_hotspot(ip_packet);
 			} else {
 				// * NAT : ip -> icmp echo id
 				timeval ts;
@@ -253,7 +249,7 @@ public:
 		gettimeofday(&ts, NULL);
 		auto raw = pcpp::RawPacket(ip_packet.data(), ip_packet.size(), ts, false);
 		auto packet = pcpp::Packet(&raw);
-		std::cerr << "Send??\n";
+
 		// * modify
 		auto eth_layer = packet.getLayerOfType<pcpp::EthLayer>();
 		eth_layer->setSourceMac(wlan_mac);
@@ -262,6 +258,23 @@ public:
 		std::cerr << packet.toString() << "\n";
 
 		wlan_dev->sendPacket(&packet);
+	}
+
+	void send_to_hotspot(Bytes ip_packet)
+	{
+		timeval ts;
+		gettimeofday(&ts, NULL);
+		auto raw = pcpp::RawPacket(ip_packet.data(), ip_packet.size(), ts, false);
+		auto packet = pcpp::Packet(&raw);
+
+		// * modify
+		auto eth_layer = packet.getLayerOfType<pcpp::EthLayer>();
+		eth_layer->setSourceMac(hotspot_mac);
+		eth_layer->setDestMac(hotspot_peer_mac);
+		packet.computeCalculateFields();
+		std::cerr << packet.toString() << "\n";
+
+		hotspot_dev->sendPacket(&packet);
 	}
 
 	// void athernet_loop()
@@ -300,7 +313,8 @@ public:
 			auto icmp_layer = packet.getLayerOfType<pcpp::IcmpLayer>();
 			auto header_ptr = icmp_layer->getIcmpHeader();
 
-			if (config.is_router() && !src_ip.matchNetwork(athernet_network)) {
+			if (config.is_router() && !src_ip.matchNetwork(athernet_network)
+				&& !src_ip.matchNetwork(hotspot_network)) {
 				// * NAT : icmp echo id -> ip
 				if (header_ptr->type == pcpp::ICMP_ECHO_REPLY) {
 					auto echo_reply = icmp_layer->getEchoReplyData();
@@ -353,6 +367,7 @@ public:
 
 	void process_icmp(Bytes bytes)
 	{
+		std::cerr << "process icmp\n";
 		using namespace std::chrono;
 
 		timeval ts;
@@ -460,6 +475,8 @@ public:
 
 	pcpp::IPv4Address hotspot_addr;
 	pcpp::IPv4Network hotspot_network;
+	pcpp::MacAddress hotspot_mac;
+	pcpp::MacAddress hotspot_peer_mac;
 	pcpp::PcapLiveDevice* hotspot_dev;
 	bool hotspot_on = false;
 
@@ -481,6 +498,25 @@ inline void wlan_loop(pcpp::RawPacket* pPacket, pcpp::PcapLiveDevice* pDevice, v
 			bytes.push_back(pPacket->getRawData()[i]);
 		}
 		ip_layer->process_packet(bytes);
+	}
+}
+
+inline void hotspot_loop(pcpp::RawPacket* pPacket, pcpp::PcapLiveDevice* pDevice, void* ip_layer_void)
+{
+	auto ip_layer = static_cast<IP_Layer*>(ip_layer_void);
+
+	auto parsed = pcpp::Packet(pPacket);
+	if (parsed.isPacketOfType(pcpp::ICMP)) {
+		Bytes bytes;
+		for (int i = 0; i < pPacket->getRawDataLen(); ++i) {
+			bytes.push_back(pPacket->getRawData()[i]);
+		}
+		timeval ts;
+		gettimeofday(&ts, NULL);
+		auto packet = pcpp::Packet(pPacket);
+		auto dest_ip = packet.getLayerOfType<pcpp::IPLayer>()->getDstIPAddress().toString();
+		std::cerr << packet.toString() << "\n";
+		ip_layer->route(dest_ip, bytes);
 	}
 }
 }
