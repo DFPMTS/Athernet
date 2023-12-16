@@ -158,7 +158,7 @@ void* Project2_main_loop(void*)
 
 	std::string s;
 	std::atomic_bool ping_interrupt;
-	std::jthread ping_thread;
+	// std::jthread ping_thread;
 
 	ping_interrupt.store(false);
 	// ping_async(ip_layer.get(), "1.1.1.1", 5, 1, 10, std::ref(ping_interrupt));
@@ -200,7 +200,7 @@ void* Project2_main_loop(void*)
 			// ping_interrupt.store(false);
 			// ping_thread = std::jthread(
 			// 	ping_async, ip_layer.get(), ip, times, interval, length, std::ref(ping_interrupt));
-			ping_async(mac_layer.get(), ip, times, interval, length, ping_interrupt);
+			ping_async(ip_layer.get(), ip, times, interval, length, ping_interrupt);
 
 		} else if (s == "e") {
 			ping_interrupt.store(true);
