@@ -197,10 +197,10 @@ void* Project2_main_loop(void*)
 					sin >> length;
 				}
 			}
-			ping_interrupt.store(false);
-			ping_thread = std::jthread(
-				ping_async, ip_layer.get(), ip, times, interval, length, std::ref(ping_interrupt));
-			// ping_async(mac_layer.get(), ip, times, interval, length, ping_interrupt);
+			// ping_interrupt.store(false);
+			// ping_thread = std::jthread(
+			// 	ping_async, ip_layer.get(), ip, times, interval, length, std::ref(ping_interrupt));
+			ping_async(mac_layer.get(), ip, times, interval, length, ping_interrupt);
 
 		} else if (s == "e") {
 			ping_interrupt.store(true);
