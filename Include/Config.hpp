@@ -146,8 +146,8 @@ public:
 			fin >> ip_address;
 		}
 
-		ip_to_mac["172.18.0.1"] = 0;
-		ip_to_mac["172.18.0.2"] = 1;
+		ip_to_mac["172.18.4.1"] = 0;
+		ip_to_mac["172.18.4.2"] = 1;
 
 		mac_address = ip_to_mac[ip_address];
 	}

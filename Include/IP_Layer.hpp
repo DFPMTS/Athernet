@@ -86,9 +86,18 @@ public:
 					std::cerr << hotspot_addr << "\n";
 					hotspot_network = pcpp::IPv4Network(hotspot_addr.toString() + "/24"s);
 					hotspot_mac = hotspot_dev->getMacAddress();
-					hotspot_peer_mac = pcpp::MacAddress("e4:a4:71:63:1c:26");
+					// * apple
+					hotspot_peer_mac = pcpp::MacAddress("f8:4d:89:91:18:b6");
+					// * thinkpad
+					// hotspot_peer_mac = pcpp::MacAddress("e4:a4:71:63:1c:26");
 
-					auto incoming_filter = pcpp::IPFilter(athernet_addr.toString(), pcpp::Direction::DST, 24);
+					auto athernet_incoming_filter
+						= pcpp::IPFilter(athernet_addr.toString(), pcpp::Direction::DST, 24);
+					auto hotspot_incoming_filter
+						= pcpp::IPFilter(hotspot_addr.toString(), pcpp::Direction::DST);
+					pcpp::OrFilter incoming_filter;
+					incoming_filter.addFilter(&athernet_incoming_filter);
+					incoming_filter.addFilter(&hotspot_incoming_filter);
 					hotspot_dev->setFilter(incoming_filter);
 					hotspot_dev->startCapture(hotspot_loop, this);
 				}
@@ -184,7 +193,8 @@ public:
 			}
 		} else {
 			// * router
-			if (dest_ip == config.get_self_ip()) {
+			if (dest_ip == config.get_self_ip() || dest_ip == hotspot_addr.toString()
+				|| dest_ip == wlan_addr.toString()) {
 				process_packet(ip_packet);
 			} else if (dest_ip_addr.matchNetwork(athernet_network)) {
 				// * send it through athernet
@@ -195,6 +205,7 @@ public:
 			} else if (dest_ip_addr.matchNetwork(hotspot_network)) {
 				send_to_hotspot(ip_packet);
 			} else {
+				// * Outgoing
 				// * NAT : ip -> icmp echo id
 				timeval ts;
 				gettimeofday(&ts, NULL);
@@ -204,40 +215,50 @@ public:
 				if (packet.isPacketOfType(pcpp::ICMP)) {
 					auto ip_layer = packet.getLayerOfType<pcpp::IPv4Layer>();
 					auto icmp_layer = packet.getLayerOfType<pcpp::IcmpLayer>();
-					if (icmp_layer->getIcmpHeader()->type != pcpp::ICMP_ECHO_REQUEST) {
-						return;
+					if (icmp_layer->getIcmpHeader()->type == pcpp::ICMP_ECHO_REQUEST) {
+						// * NAT
+						auto echo_request = icmp_layer->getEchoRequestData();
+						int id = pcpp::netToHost16(echo_request->header->id);
+						int seq = pcpp::netToHost16(echo_request->header->sequence);
+						uint64_t timestamp = echo_request->header->timestamp;
+
+						Bytes req_data;
+						for (int i = 0; i < echo_request->dataLength; ++i) {
+							req_data.push_back(echo_request->data[i]);
+						}
+
+						auto src_ip = ip_layer->getSrcIPv4Address().toString();
+						auto ip_and_id = std::make_pair(src_ip, id);
+						if (!ip_and_id_to_echo_id[ip_and_id]) {
+							++cur_echo_id;
+							ip_and_id_to_echo_id[ip_and_id] = cur_echo_id;
+							echo_id_to_ip_and_id[cur_echo_id] = ip_and_id;
+						}
+						auto echo_id = ip_and_id_to_echo_id[ip_and_id];
+
+						ip_layer->setSrcIPv4Address(wlan_addr);
+						icmp_layer->setEchoRequestData(
+							echo_id, seq, timestamp, req_data.data(), req_data.size());
+
+						// * throw it to WLAN interface
+						auto raw_packet = packet.getRawPacket();
+
+						Bytes bytes;
+						for (int i = 0; i < raw_packet->getRawDataLen(); ++i) {
+							bytes.push_back(raw_packet->getRawData()[i]);
+						}
+						send_to_wlan(bytes);
+					} else if (icmp_layer->getIcmpHeader()->type == pcpp::ICMP_ECHO_REPLY) {
+						// * swap src & payload
+						auto echo_reply = icmp_layer->getEchoReplyData();
+						auto src_ip = ip_layer->getSrcIPv4Address();
+						auto real_src = pcpp::IPv4Address(&echo_reply->data[1]);
+						for (int i = 0; i < 4; ++i) {
+							echo_reply->data[1 + i] = src_ip.toBytes()[i];
+						}
+						ip_layer->setSrcIPv4Address(real_src);
+						send_to_wlan(ip_packet);
 					}
-
-					auto echo_request = icmp_layer->getEchoRequestData();
-					int id = pcpp::netToHost16(echo_request->header->id);
-					int seq = pcpp::netToHost16(echo_request->header->sequence);
-					uint64_t timestamp = echo_request->header->timestamp;
-
-					Bytes req_data;
-					for (int i = 0; i < echo_request->dataLength; ++i) {
-						req_data.push_back(echo_request->data[i]);
-					}
-
-					auto src_ip = ip_layer->getSrcIPv4Address().toString();
-					auto ip_and_id = std::make_pair(src_ip, id);
-					if (!ip_and_id_to_echo_id[ip_and_id]) {
-						++cur_echo_id;
-						ip_and_id_to_echo_id[ip_and_id] = cur_echo_id;
-						echo_id_to_ip_and_id[cur_echo_id] = ip_and_id;
-					}
-					auto echo_id = ip_and_id_to_echo_id[ip_and_id];
-
-					ip_layer->setSrcIPv4Address(wlan_addr);
-					icmp_layer->setEchoRequestData(echo_id, seq, timestamp, req_data.data(), req_data.size());
-
-					// * throw it to WLAN interface
-					auto raw_packet = packet.getRawPacket();
-
-					Bytes bytes;
-					for (int i = 0; i < raw_packet->getRawDataLen(); ++i) {
-						bytes.push_back(raw_packet->getRawData()[i]);
-					}
-					send_to_wlan(bytes);
 				}
 			}
 		}
@@ -309,9 +330,19 @@ public:
 		if (packet.isPacketOfType(pcpp::ICMP)) {
 			auto ip_layer = packet.getLayerOfType<pcpp::IPv4Layer>();
 			auto src_ip = ip_layer->getSrcIPv4Address();
+			auto dest_ip = ip_layer->getDstIPv4Address();
 
 			auto icmp_layer = packet.getLayerOfType<pcpp::IcmpLayer>();
 			auto header_ptr = icmp_layer->getIcmpHeader();
+
+			// * hijack reply from hotspot
+			if (config.is_router() && src_ip.matchNetwork(hotspot_network)
+				&& header_ptr->type == pcpp::ICMP_ECHO_REPLY) {
+				ip_layer->setDstIPv4Address(pcpp::IPv4Address(src_to_real_dest[src_ip.toString()]));
+				std::cerr << "Hijacked!\n";
+				route(ip_layer->getDstIPv4Address().toString(), bytes);
+				return;
+			}
 
 			if (config.is_router() && !src_ip.matchNetwork(athernet_network)
 				&& !src_ip.matchNetwork(hotspot_network)) {
@@ -357,6 +388,42 @@ public:
 					} else {
 						// * Throw it to where it should belong
 						route(real_ip, bytes);
+					}
+				}
+				// * NAT Traversal:
+				// * Format: (ping on mac) -p ffAABBCCDD, where AA/BB/CC/DD is the hex representation of
+				// * x/y/z/w/ in address like x.y.z.w
+				else {
+					// * check if this ping request addresses an internal node
+					auto echo_request = icmp_layer->getEchoRequestData();
+					if (echo_request->dataLength >= 5) {
+						// * First byte = -1 marks the ping data carries internal address
+						if (echo_request->data[0] == 255) {
+							auto internal_address = pcpp::IPv4Address(echo_request->data + 1);
+							std::cerr << "Internal address:   " << internal_address.toString() << "\n";
+							// * Athernet or Hotspot
+							if (internal_address.matchNetwork(athernet_network)
+								|| internal_address.matchNetwork(hotspot_network)) {
+								std::cerr << "Internal Matched\n";
+								// * swap
+								for (int i = 0; i < 4; ++i) {
+									echo_request->data[1 + i] = dest_ip.toBytes()[i];
+								}
+								ip_layer->setDstIPv4Address(internal_address);
+								if (internal_address.matchNetwork(hotspot_network)) {
+									real_dst_to_src[ip_layer->getSrcIPv4Address().toString()]
+										= internal_address.toString();
+									src_to_real_dest[internal_address.toString()]
+										= ip_layer->getSrcIPv4Address().toString();
+									ip_layer->setSrcIPv4Address(hotspot_addr);
+								}
+								route(internal_address.toString(), bytes);
+							}
+
+						} else {
+							// * nothing we can do
+							return;
+						}
 					}
 				}
 			} else {
@@ -484,6 +551,9 @@ public:
 	std::map<IpAndId, int> ip_and_id_to_echo_id;
 	std::map<int, IpAndId> echo_id_to_ip_and_id;
 
+	std::map<std::string, std::string> src_to_real_dest;
+	std::map<std::string, std::string> real_dst_to_src;
+
 	std::vector<uint64_t> RTTs;
 };
 
@@ -498,6 +568,7 @@ inline void wlan_loop(pcpp::RawPacket* pPacket, pcpp::PcapLiveDevice* pDevice, v
 			bytes.push_back(pPacket->getRawData()[i]);
 		}
 		ip_layer->process_packet(bytes);
+		std::cerr << parsed.toString() << "\n";
 	}
 }
 
