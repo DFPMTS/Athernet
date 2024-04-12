@@ -1,6 +1,3 @@
-# Athernet Project 3
-## TODO
+# Athernet Project
 
-1. Add IP layer
-2. Cover up the weird TCP-like MAC header 
-3. 
+Project documentation: https://sist-cs120.github.io/project-doc/
